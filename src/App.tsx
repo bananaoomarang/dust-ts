@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import Dust from './Dust'
 import Point from './Point'
 import * as glUtil from './gl-util'
-import BrushSelector from './BrushSelector.js'
+import BrushSelector from './BrushSelector'
 import './App.css'
 
 function getSafeCoords(x: number, y: number): Point {
