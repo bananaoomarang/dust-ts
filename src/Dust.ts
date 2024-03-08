@@ -1,5 +1,4 @@
 import Timer from './Timer'
-import Point from './Point'
 import * as glUtil from './gl-util'
 import vertShader from './shaders/vert.glsl?raw'
 import fragShader from './shaders/frag.glsl?raw'
@@ -148,27 +147,34 @@ export default class Dust {
     gl.vertexAttribPointer(colorAttribute, 1, gl.FLOAT, false, 12, 8)
   }
 
-  move = (pointA: Point, pointB: Point) => {
+  move = (x1: number, y1: number, x2: number, y2: number) => {
     if (
-      pointB.x === 0 ||
-      pointB.x >= WIDTH - 1 ||
-      pointB.y === 0 ||
-      pointB.y >= HEIGHT - 1
+      x2 === 0 ||
+      x2 >= WIDTH - 1 ||
+      y2 === 0 ||
+      y2 >= HEIGHT - 1
     ) {
       return
     }
 
-    const d = this.grid[pointA.x][pointA.y]
+    const d = this.grid[x1][y1]
 
-    this.grid[pointA.x][pointA.y] = 0
-    this.grid[pointB.x][pointB.y] = d
-    this.blacklist[pointA.x][pointB.y] = 1
+    this.grid[x1][y1] = 0
+    this.grid[x2][y2] = d
+    this.blacklist[x1][y2] = 1
 
-    this.wakeSurrounds(pointA.x, pointA.y)
+    this.wakeSurrounds(x1, y1)
   }
 
   swap = (x1: number, y1: number, x2: number, y2: number) => {
-    if (x2 === 0 || x2 >= WIDTH - 1 || y2 === 0 || y2 >= HEIGHT - 1) return
+    if (
+      x2 === 0 ||
+      x2 >= WIDTH - 1 ||
+      y2 === 0 ||
+      y2 >= HEIGHT - 1
+    ) {
+      return
+    }
 
     const d1 = this.grid[x1][y1]
     const d2 = this.grid[x2][y2]
@@ -181,212 +187,81 @@ export default class Dust {
   }
 
   update = () => {
-    const self = this
     let lived = false
 
     let rx = Math.floor(Math.random() * 500) % (this.grid.length - 1)
-    const xIncrement = 7
+    const xIncrement = 8
 
     for (let x = 1; x < this.grid.length - 1; x++) {
-      let ry = Math.floor(Math.random() * 500) % (this.grid[x].length - 1)
+      const yLen = this.grid[x].length - 1
+
+      let ry = Math.floor(Math.random() * 500) % yLen
       const yIncrement = 2
 
-      rx = (rx + xIncrement) % (this.grid.length - 1)
+      rx = (rx + xIncrement) % yLen
 
-      if (rx === 0 || rx === this.grid[x].length) continue
+      if (rx === 0 || rx === this.grid[x].length) {
+        continue
+      }
 
       for (let y = this.grid[x].length; y > 0; y--) {
-        ry = (ry + yIncrement) % (this.grid.length - 1)
+        ry = (ry + yIncrement) % yLen
 
-        // If we think we're gonna incur OOBE, get the HELL out of there.
-        if (ry === 0 || ry === this.grid[x].length) continue
+        //
+        // Skip if we think we are out of bounds
+        //
+        if (ry === 0 || ry === this.grid[x].length) {
+          continue
+        }
 
         const d = this.grid[rx][ry]
-        const m = this.getMaterial(d)
+        const material = this.getMaterial(d)
         const xDir = Math.random() < 0.5 ? 1 : -1
 
-        if (d === 0) continue
-
-        if (this.blacklist[rx][ry]) continue
-
-        // This is a spring
-        if (d & WATER && d & SOLID) {
-          this.infect(rx, ry, 0, WATER)
+        if (d === 0) {
+          continue
         }
 
-        // Oil spring
-        if (d & OIL && d & SOLID) {
-          this.infect(rx, ry, 0, OIL)
+        if (this.blacklist[rx][ry]) {
+          continue
         }
 
-        // Lava spring
-        if (d & LAVA && d & SOLID) {
-          this.infect(rx, ry, 0, LAVA)
+        this.updateSprings(d, rx, ry)
+
+        if (d & SOLID) {
+          continue
         }
 
-        if (d & SOLID) continue
+        this.updateExplosions()
 
-        for (let e = 0; e < this.explosions.length; e++) {
-          const exp = this.explosions[e]
-
-          if (!exp.updated) {
-            exp.update()
-            this.spawnCircle(exp.x, exp.y, FIRE, exp.radius)
-          }
-
-          if (exp.force === 0) {
-            this.explosions.splice(e, 1)
-            e--
-          }
-        }
-
-        if (d & INFECTANT && !this.surrounded(rx, ry)) {
-          this.runOnSurrounds(rx, ry, function (x, y) {
-            const cell = self.grid[x][y]
-
-            if (cell & INFECTANT) return
-
-            if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
-              const rand = Math.random()
-
-              if (cell !== 0 && rand > 0.91) self.spawn(x, y, d)
-            }
-          })
+        if (d & INFECTANT) {
+          this.updateInfections(d, rx, ry)
         }
 
         if (d & LIFE) {
-          if (this.lifeTimer.getTime() >= this.lifeTime) {
+          if (this.updateLife(rx, ry)) {
             lived = true
-
-            let neighbours = this.countNeighbours(rx, ry, true)
-
-            if (neighbours < 2) this.destroy(rx, ry)
-            if (neighbours > 3) this.destroy(rx, ry)
-
-            this.runOnSurrounds(rx, ry, function (x, y) {
-              if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
-                if (!self.blacklist[x][y] && self.grid[x][y] === 0) {
-                  neighbours = self.countNeighbours(x, y)
-
-                  if (neighbours === 3) {
-                    self.spawn(x, y, LIFE)
-                  }
-
-                  // Not a misatake, this makes it work better
-                  self.blacklist[x][y] = 1
-                }
-              }
-            })
           }
         }
 
-        if (d & FIRE) {
-          if (Math.random() > 0.8) this.grid[rx][ry] |= BURNING
+        this.updateFire(d, rx, ry)
+
+        if (d & LIFE || d & C4) {
+          continue
         }
 
-        if (d & BURNING && Math.random() > 0.8 && !this.blacklist[rx][ry]) {
-          if (d & C4) this.explode(rx, ry, 40, 100)
+        this.updateWater(d, rx, ry)
+        this.updateFloating(d, rx, ry, material, xDir)
 
-          this.destroy(rx, ry)
-        } else {
-          this.blacklist[rx][ry] = 1
+        if (d & RESTING) {
+          continue
         }
-
-        // Burn baby burn
-        if (d & FIRE || d & LAVA || d & BURNING) {
-          this.infect(rx, ry, LIFE, BURNING)
-          this.infect(rx, ry, C4, BURNING)
-
-          if (Math.random() > 0.5) {
-            this.infect(rx, ry, OIL, BURNING)
-            this.infect(rx, ry, WATER, STEAM, WATER)
-          }
-        }
-
-        if (d & LIFE || d & C4) continue
-
-        // Chance that steam will condense + it will condense if it's surrounded by steam
-        if (d & STEAM) {
-          if (Math.random() > 0.9999) {
-            this.spawn(rx, ry, WATER)
-          } else if (this.surrounded(rx, ry)) {
-            this.spawn(rx, ry, WATER)
-          }
-        }
-
-        // Water baby... errr.... Water?
-        if (d & WATER) {
-          // Put out fires
-          if (Math.random() > 0.5) {
-            this.runOnSurrounds(rx, ry, this.destroy, FIRE)
-            this.infect(rx, ry, BURNING, BURNING)
-          }
-        }
-
-        const um = this.getMaterial(this.grid[rx][ry - 1])
-        const uxDirm = this.getMaterial(this.grid[rx + xDir][ry - 1])
-
-        if (
-          typeof m.density !== 'undefined' && 
-          typeof um.density !== 'undefined' &&
-          typeof uxDirm.density !== 'undefined'
-        ) {
-          if (m.density < um.density) {
-            if (d & FIRE) {
-              this.swap(rx, ry, rx, ry - 1)
-            } else if (Math.random() < 0.7) {
-              this.swap(rx, ry, rx + xDir, ry - 1)
-            } else if (Math.random() < 0.7) {
-              this.swap(rx, ry, rx, ry - 1)
-            }
-          }
-        }
-
-        if (d & RESTING) continue
 
         if (this.grid[rx][ry + 1] === 0) {
-          this.move({x: rx, y: ry}, { x: rx, y: ry + 1})
+          this.move(rx, ry, rx, ry + 1)
         }
 
-        // NB This code is paraphrased from http://pok5.de/elementdots/js/dots.js, so full credit where it's due.
-        if (m.liquid && rx + 3 < WIDTH && rx - 3 > 0) {
-          const r1 = this.grid[rx + 1][ry]
-          const r2 = this.grid[rx + 2][ry]
-          const r3 = this.grid[rx + 3][ry]
-          const l1 = this.grid[rx - 1][ry]
-          const l2 = this.grid[rx - 2][ry]
-          const l3 = this.grid[rx - 3][ry]
-          const c = this.grid[rx][ry]
-
-          const w = ((r1 === c) ? 1 : 0) + ((r2 === c) ? 1 : 0) + ((r3 === c) ? 1 : 0) - ((l1 === c) ? 1 : 0) - ((l2 === c) ? 1 : 0) - ((l3 === c) ? 1 : 0)
-
-          if (w <= 0 && Math.random() < 0.5) {
-            if (r1 === 0 && this.grid[rx + 1][ry - 1] !== c) {
-              this.move({x: rx, y: ry}, {x: rx + 1, y: ry })
-            } else if (r2 === 0 && this.grid[rx + 2][ry - 1] !== c) {
-              this.move({x: rx, y: ry}, {x: rx + 2, y: ry})
-            } else if (r3 === 0 && this.grid[rx + 3][ry - 1] !== c) {
-              this.move({x: rx, y: ry}, {x: rx + 3, y: ry})
-            }
-          } else if (w >= 0 && Math.random() < 0.5) {
-            if (l1 === 0 && this.grid[rx - 1][ry - 1] !== c) {
-              this.move({x: rx, y: ry}, {x: rx - 1, y: ry})
-            } else if (l2 === 0 && this.grid[rx - 2][ry - 1] !== c) {
-              this.move({x: rx, y: ry}, {x: rx - 2, y: ry})
-            } else if (l3 === 0 && this.grid[rx - 3][ry - 1] !== c) {
-              this.move({x: rx, y: ry}, {x: rx - 3, y: ry})
-            }
-          }
-        } else {
-          if (this.grid[rx + xDir][ry + 1] === 0) {
-            this.move({x: rx, y: ry}, {x: rx + xDir, y: ry + 1})
-          } else {
-            // Check if the particle should be RESTING
-            if (this.shouldLieDown(rx, ry)) {
-              this.grid[rx][ry] |= RESTING
-            }
-          }
-        }
+        this.updateGeneric(rx, ry, material, xDir)
       }
     }
 
@@ -473,6 +348,225 @@ export default class Dust {
     window.requestAnimationFrame(this.run)
   }
 
+  updateSprings = (cellValue: number, x: number, y: number) => {
+    //
+    // This is a spring
+    //
+    if (cellValue & WATER && cellValue & SOLID) {
+      this.infect(x, y, 0, WATER)
+    }
+
+    //
+    // Oil spring
+    //
+    if (cellValue & OIL && cellValue & SOLID) {
+      this.infect(x, y, 0, OIL)
+    }
+
+    //
+    // Lava spring
+    //
+    if (cellValue & LAVA && cellValue & SOLID) {
+      this.infect(x, y, 0, LAVA)
+    }
+  }
+
+  updateExplosions = () => {
+    for (let e = 0; e < this.explosions.length; e++) {
+      const exp = this.explosions[e]
+
+      if (!exp.updated) {
+        exp.update()
+        this.spawnCircle(exp.x, exp.y, FIRE, exp.radius)
+      }
+
+      if (exp.force === 0) {
+        this.explosions.splice(e, 1)
+        e--
+      }
+    }
+  }
+
+  updateLife = (x: number, y: number): boolean => {
+    const self = this
+    let lived = false
+
+    if (this.lifeTimer.getTime() >= this.lifeTime) {
+      lived = true
+
+      let neighbours = this.countNeighbours(x, y, true)
+
+      if (neighbours < 2) this.destroy(x, y)
+      if (neighbours > 3) this.destroy(x, y)
+
+      this.runOnSurrounds(x, y, function (x, y) {
+        if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
+          if (!self.blacklist[x][y] && self.grid[x][y] === 0) {
+            neighbours = self.countNeighbours(x, y)
+
+            if (neighbours === 3) {
+              self.spawn(x, y, LIFE)
+            }
+
+            //
+            // Not a misatake, this makes it work better
+            //
+            self.blacklist[x][y] = 1
+          }
+        }
+      })
+    }
+
+    return lived
+  }
+
+  updateInfections = (cellValue: number, x: number, y: number) => {
+    const self = this
+
+    if (!this.surrounded(x, y)) {
+      return
+    }
+
+    this.runOnSurrounds(x, y, function (x, y) {
+      const cell = self.grid[x][y]
+
+      if (cell & INFECTANT) {
+        return
+      }
+
+      if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
+        const rand = Math.random()
+
+        if (cell !== 0 && rand > 0.91) {
+          self.spawn(x, y, cellValue)
+        }
+      }
+    })
+  }
+
+  //
+  // Handle fire, burning and things of that nature
+  //
+  updateFire = (cellValue: number, x: number, y: number) => {
+    if (cellValue & FIRE && Math.random() > 0.8) {
+      this.grid[x][y] |= BURNING
+    }
+
+    if (cellValue & BURNING && Math.random() > 0.8 && !this.blacklist[x][y]) {
+      if (cellValue & C4) {
+        this.explode(x, y, 40, 100)
+      }
+
+      this.destroy(x, y)
+    } else {
+      this.blacklist[x][y] = 1
+    }
+
+    // Burn baby burn
+    if (cellValue & FIRE || cellValue & LAVA || cellValue & BURNING) {
+      this.infect(x, y, LIFE, BURNING)
+      this.infect(x, y, C4, BURNING)
+
+      if (Math.random() > 0.5) {
+        this.infect(x, y, OIL, BURNING)
+        this.infect(x, y, WATER, STEAM, WATER)
+      }
+    }
+  }
+
+  updateWater = (cellValue: number, x: number, y: number) => {
+    //
+    // Chance that steam will condense + it will condense if it's surrounded by steam
+    //
+    if (cellValue & STEAM) {
+      if (Math.random() > 0.9999) {
+        this.spawn(x, y, WATER)
+      } else if (this.surrounded(x, y)) {
+        this.spawn(x, y, WATER)
+      }
+    }
+
+    //
+    // Put out fires
+    //
+    if (cellValue & WATER && Math.random() > 0.5) {
+      this.runOnSurrounds(x, y, this.destroy, FIRE)
+      this.infect(x, y, BURNING, BURNING)
+    }
+  }
+
+  //
+  // Handle changes due to material density
+  //
+  updateFloating = (cellValue: number, x: number, y: number, material: Material, xDir: number) => {
+    const materialAbove = this.getMaterial(
+      this.grid[x][y - 1]
+    )
+    const materialAboveSide = this.getMaterial(
+      this.grid[x + xDir][y - 1]
+    )
+
+    if (
+      typeof material.density !== 'undefined' && 
+        typeof materialAbove.density !== 'undefined' &&
+        typeof materialAboveSide.density !== 'undefined'
+    ) {
+      if (material.density < materialAbove.density) {
+        if (cellValue & FIRE) {
+          this.swap(x, y, x, y - 1)
+        } else if (Math.random() < 0.7) {
+          this.swap(x, y, x + xDir, y - 1)
+        } else if (Math.random() < 0.7) {
+          this.swap(x, y, x, y - 1)
+        }
+      }
+    }
+  }
+
+  //
+  // NB This code is paraphrased from http://pok5.de/elementdots/js/dots.js, so full credit where it's due.
+  //
+  updateGeneric = (x: number, y: number, material: Material, xDir: number) => {
+    if (material.liquid && x + 3 < WIDTH && x - 3 > 0) {
+      const r1 = this.grid[x + 1][y]
+      const r2 = this.grid[x + 2][y]
+      const r3 = this.grid[x + 3][y]
+      const l1 = this.grid[x - 1][y]
+      const l2 = this.grid[x - 2][y]
+      const l3 = this.grid[x - 3][y]
+      const c = this.grid[x][y]
+
+      const w = ((r1 === c) ? 1 : 0) + ((r2 === c) ? 1 : 0) + ((r3 === c) ? 1 : 0) - ((l1 === c) ? 1 : 0) - ((l2 === c) ? 1 : 0) - ((l3 === c) ? 1 : 0)
+
+      if (w <= 0 && Math.random() < 0.5) {
+        if (r1 === 0 && this.grid[x + 1][y - 1] !== c) {
+          this.move(x, y, x + 1, 0)
+        } else if (r2 === 0 && this.grid[x + 2][y - 1] !== c) {
+          this.move(x, y, x + 2, 0)
+        } else if (r3 === 0 && this.grid[x + 3][y - 1] !== c) {
+          this.move(x, y, x + 3, 0)
+        }
+      } else if (w >= 0 && Math.random() < 0.5) {
+        if (l1 === 0 && this.grid[x - 1][y - 1] !== c) {
+          this.move(x, y, x - 1, 0)
+        } else if (l2 === 0 && this.grid[x - 2][y - 1] !== c) {
+          this.move(x, y, x - 2, 0)
+        } else if (l3 === 0 && this.grid[x - 3][y - 1] !== c) {
+          this.move(x, y, x - 3, 0)
+        }
+      }
+    } else {
+      if (this.grid[x + xDir][y + 1] === 0) {
+        this.move(x, y, x + xDir, y + 1)
+      } else {
+        // Check if the particle should be RESTING
+        if (this.shouldLieDown(x, y)) {
+          this.grid[x][y] |= RESTING
+        }
+      }
+    }
+  }
+
   getMaterial = (s: number) => {
     if (s === 0) return MATERIALS.space
     if (s & SAND) return MATERIALS.sand
@@ -495,7 +589,6 @@ export default class Dust {
       }
     }
   }
-
 
   wakeSurrounds = (x: number, y: number) => {
     if (this.grid[x][y] & RESTING) this.grid[x][y] ^= RESTING
@@ -592,7 +685,6 @@ export default class Dust {
     if (this.grid[x][y] === (this.grid[x + 1][y] && this.grid[x - 1][y] && this.grid[x][y + 1] &&
       this.grid[x][y - 1] && this.grid[x + 1][y + 1] && this.grid[x + 1][y - 1] && this.grid[x - 1][y + 1] && this.grid[x - 1][y - 1])) { return true } else { return false }
   }
-
 
   //
   // Runs a function on surrounding particles providing a flag is set

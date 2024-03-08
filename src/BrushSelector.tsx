@@ -1,3 +1,5 @@
+import styles from './styles/BrushSelector.module.css'
+
 const TYPES = [
   {
     label: 'Sand',
@@ -58,7 +60,7 @@ interface BrushSelectorProps {
 
 function BrushSelector ({ selected, setSelected, infect, setInfect }: BrushSelectorProps) {
   return (
-    <form>
+    <form className={styles.wrapper}>
       {
         TYPES.map(type => (
           <label key={type.value}>

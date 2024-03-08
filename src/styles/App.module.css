@@ -1,0 +1,10 @@
+.wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 80rem;
+}
+
+.canvas {
+  border: 1px solid white;
+}

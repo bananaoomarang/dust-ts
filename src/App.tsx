@@ -3,7 +3,7 @@ import Dust from './Dust'
 import Point from './Point'
 import * as glUtil from './gl-util'
 import BrushSelector from './BrushSelector'
-import './App.css'
+import styles from './styles/App.module.css'
 
 function getSafeCoords(x: number, y: number): Point {
   return new Point(
@@ -105,8 +105,8 @@ function App() {
   })
 
   return (
-    <div>
-      <canvas ref={canvas} className="canvas" width="500" height="500" />
+    <div className={styles.wrapper}>
+      <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
       <BrushSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
     </div>
   )
