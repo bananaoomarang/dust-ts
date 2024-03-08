@@ -1,24 +1,23 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import Dust from './Dust'
+import Point from './Point'
 import * as glUtil from './gl-util'
+import BrushSelector from './BrushSelector.js'
 import './App.css'
 
-type Point = {
-  x: number
-  y: number
-}
-
-function getCoords (x: number, y: number): Point {
-  return {
-    x: Math.min(Math.round(x), 500),
-    y: Math.min(Math.round(y), 500)
-  }
+function getSafeCoords(x: number, y: number): Point {
+  return new Point(
+    Math.min(Math.round(x), 500),
+    Math.min(Math.round(y), 500)
+  )
 }
 
 function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const dust = useRef<Dust | null>(null)
   const mousedown = useRef<boolean>(false)
+  const [selectedBrush, setSelectedBrush] = useState('sand')
+  const [infect, setInfect] = useState(false)
 
   const handleMousedown = useCallback((e: MouseEvent) => {
     mousedown.current = true
@@ -30,9 +29,9 @@ function App() {
       return
     }
 
-    const point = getCoords(offsetX, offsetY)
-    game.spawnCircle(point.x, point.y, 'sand', 10, false)
-  }, [])
+    const point = getSafeCoords(offsetX, offsetY)
+    game.spawnCircle(point.x, point.y, selectedBrush, 10, infect)
+  }, [selectedBrush, infect])
 
   const handleMousemove = useCallback((e: MouseEvent) => {
     const canvasNode = canvas.current
@@ -45,9 +44,9 @@ function App() {
       return
     }
 
-    const point = getCoords(clientX - canvasNode.offsetLeft, clientY - canvasNode.offsetTop)
-    game.spawnCircle(point.x, point.y, 'sand', 10, false)
-  }, [])
+    const point = getSafeCoords(clientX - canvasNode.offsetLeft, clientY - canvasNode.offsetTop)
+    game.spawnCircle(point.x, point.y, selectedBrush, 10, false)
+  }, [selectedBrush])
 
   const handleMouseup = useCallback(() => {
     mousedown.current = false
@@ -108,6 +107,7 @@ function App() {
   return (
     <div>
       <canvas ref={canvas} className="canvas" width="500" height="500" />
+      <BrushSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
     </div>
   )
 }
