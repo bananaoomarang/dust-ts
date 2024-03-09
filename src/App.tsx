@@ -7,11 +7,20 @@ import MaterialSelector from './MaterialSelector'
 import BrushSelector from './BrushSelector'
 import styles from './styles/App.module.css'
 
-function getSafeCoords(x: number, y: number): Point {
-  return new Point(
-    Math.min(Math.round(x), 500),
-    Math.min(Math.round(y), 500)
-  )
+function getBrushCoords(
+  x: number,
+  y: number,
+  canvas: HTMLCanvasElement
+): Point {
+  const point = new Point(x, y)
+  const rect = canvas.getBoundingClientRect()
+  point.x = (point.x / rect.width) * canvas.width
+  point.y = (point.y / rect.height) * canvas.height
+
+  point.x = Math.min(Math.round(point.x), 500)
+  point.y = Math.min(Math.round(point.y), 500)
+
+  return point
 }
 
 function App() {
@@ -27,13 +36,14 @@ function App() {
     mousedown.current = true
 
     const game = dust.current
+    const canvasNode = canvas.current
     const { offsetX, offsetY } = e
 
-    if (!game) {
+    if (!game || !canvasNode) {
       return
     }
 
-    const point = getSafeCoords(offsetX, offsetY)
+    const point = getBrushCoords(offsetX, offsetY, canvasNode)
     game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
   }, [selectedBrush, infect, brushSize])
 
@@ -48,7 +58,11 @@ function App() {
       return
     }
 
-    const point = getSafeCoords(clientX - canvasNode.offsetLeft, clientY - canvasNode.offsetTop)
+    const point = getBrushCoords(
+      clientX - canvasNode.offsetLeft,
+      clientY - canvasNode.offsetTop,
+      canvasNode
+    )
     game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
   }, [selectedBrush, infect, brushSize])
 
