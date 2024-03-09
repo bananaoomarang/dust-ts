@@ -4,9 +4,9 @@ import vertShader from './shaders/vert.glsl?raw'
 import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 
-const MAX_GRAINS = 100000
 const WIDTH = 500
 const HEIGHT = 500
+const MAX_GRAINS = WIDTH * HEIGHT
 
 const SAND = 1
 const OIL = 2

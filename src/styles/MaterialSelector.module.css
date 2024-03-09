@@ -1,0 +1,24 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  border: 1px solid white;
+  border-left: none;
+  height: fit-content;
+  user-select: none;
+}
+
+.label {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  font-weight: bold;
+  padding: 0.25rem 0;
+}
+
+.labelText {
+  padding-left: 0.25rem;
+}
+
+.emoji {
+  margin-left: auto;
+}
