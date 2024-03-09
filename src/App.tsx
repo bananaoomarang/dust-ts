@@ -23,6 +23,40 @@ function getBrushCoords(
   return point
 }
 
+const getEventCoords = (e: MouseEvent | TouchEvent) => {
+  if (e instanceof MouseEvent) {
+    return e
+  } else {
+    return e.targetTouches[0]
+  }
+}
+
+interface HandleSpawnOpts {
+  game: Dust
+  canvasNode: HTMLCanvasElement
+  e: MouseEvent | TouchEvent
+  selectedBrush: string
+  brushSize: number
+  infect: boolean
+}
+
+const handleSpawnBrush = ({
+  game,
+  canvasNode,
+  e,
+  selectedBrush,
+  brushSize,
+  infect
+}: HandleSpawnOpts) => {
+  const { clientX, clientY } = getEventCoords(e)
+  const point = getBrushCoords(
+    clientX - canvasNode.offsetLeft,
+    clientY - canvasNode.offsetTop,
+    canvasNode
+  )
+  game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+}
+
 function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const fpsLad = useRef<HTMLElement | null>(null)
@@ -32,38 +66,33 @@ function App() {
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
 
-  const handleMousedown = useCallback((e: MouseEvent) => {
+  const handleMousedown = useCallback((e: MouseEvent | TouchEvent) => {
     mousedown.current = true
 
     const game = dust.current
     const canvasNode = canvas.current
-    const { offsetX, offsetY } = e
+
+    e.preventDefault()
 
     if (!game || !canvasNode) {
       return
     }
 
-    const point = getBrushCoords(offsetX, offsetY, canvasNode)
-    game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+    handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize })
   }, [selectedBrush, infect, brushSize])
 
-  const handleMousemove = useCallback((e: MouseEvent) => {
+  const handleMousemove = useCallback((e: MouseEvent | TouchEvent) => {
     const canvasNode = canvas.current
     const game = dust.current
     const mouseIsDown = mousedown.current
 
-    const { clientX, clientY} = e
+    e.preventDefault()
 
     if (!canvasNode || !game || !mouseIsDown) {
       return
     }
 
-    const point = getBrushCoords(
-      clientX - canvasNode.offsetLeft,
-      clientY - canvasNode.offsetTop,
-      canvasNode
-    )
-    game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+    handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize })
   }, [selectedBrush, infect, brushSize])
 
   const handleMouseup = useCallback(() => {
@@ -110,14 +139,20 @@ function App() {
     }
 
     canvas.current.addEventListener('mousedown', handleMousedown)
+    canvas.current.addEventListener('touchstart', handleMousedown)
     canvas.current.addEventListener('mousemove', handleMousemove)
+    canvas.current.addEventListener('touchmove', handleMousemove)
     window.addEventListener('mouseup', handleMouseup)
+    window.addEventListener('touchend', handleMouseup)
     window.addEventListener('keydown', handleKeydown)
 
     return () => {
       canvas.current?.removeEventListener('mousedown', handleMousedown)
+      canvas.current?.removeEventListener('touchstart', handleMousedown)
       canvas.current?.removeEventListener('mousemove', handleMousemove)
+      canvas.current?.removeEventListener('touchmove', handleMousemove)
       window.removeEventListener('mouseup', handleMouseup)
+      window.removeEventListener('touchend', handleMouseup)
       window.removeEventListener('keydown', handleKeydown)
     }
   })
