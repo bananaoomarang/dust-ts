@@ -1,9 +1,16 @@
 .wrapper {
   display: flex;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   margin: 0 auto;
   max-width: 80rem;
-  align-content: flex-start;
+  padding: 1rem;
+
+  @media (--break-large) {
+    flex-direction: row;
+    align-items: flex-start;
+  }
 }
 
 .header {
@@ -11,7 +18,15 @@
 }
 
 .canvas {
+  width: 100%;
+  max-width: 500px;
+  box-sizing: border-box;
   border: 1px solid white;
+  margin-top: 1rem;
+
+  @media (--break-large) {
+    margin-top: 0;
+  }
 }
 
 .fps {
