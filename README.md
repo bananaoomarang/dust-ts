@@ -1,3 +1,5 @@
-# Dust (Typescript) #
+# Cellular Automata Sandbox #
 
-WIP typescript port/update of: https://github.com/bananaoomarang/Dust
+![Screenshot](screenshot.png)
+
+Typescript port/update of: https://github.com/bananaoomarang/Dust
