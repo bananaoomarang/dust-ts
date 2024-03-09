@@ -580,29 +580,29 @@ export default class Dust {
 
       if (w <= 0 && Math.random() < 0.5) {
         if (r1 === 0 && this.grid[x + 1][y - 1] !== c) {
-          this.move(x, y, x + 1, 0)
+          this.move(x, y, x + 1, y)
         } else if (r2 === 0 && this.grid[x + 2][y - 1] !== c) {
-          this.move(x, y, x + 2, 0)
+          this.move(x, y, x + 2, y)
         } else if (r3 === 0 && this.grid[x + 3][y - 1] !== c) {
-          this.move(x, y, x + 3, 0)
+          this.move(x, y, x + 3, y)
         }
       } else if (w >= 0 && Math.random() < 0.5) {
         if (l1 === 0 && this.grid[x - 1][y - 1] !== c) {
-          this.move(x, y, x - 1, 0)
+          this.move(x, y, x - 1, y)
         } else if (l2 === 0 && this.grid[x - 2][y - 1] !== c) {
-          this.move(x, y, x - 2, 0)
+          this.move(x, y, x - 2, y)
         } else if (l3 === 0 && this.grid[x - 3][y - 1] !== c) {
-          this.move(x, y, x - 3, 0)
+          this.move(x, y, x - 3, y)
         }
       }
     } else {
       if (this.grid[x + xDir][y + 1] === 0) {
         this.move(x, y, x + xDir, y + 1)
-      } else {
+      } else if (this.shouldLieDown(x, y)) {
+        //
         // Check if the particle should be RESTING
-        if (this.shouldLieDown(x, y)) {
-          this.grid[x][y] |= RESTING
-        }
+        //
+        this.grid[x][y] |= RESTING
       }
     }
   }
@@ -817,6 +817,10 @@ export default class Dust {
   }
 
   spawnCircle = (x: number, y: number, type: string | number, brushSize: number, infect: boolean = false) => {
+    //
+    // TODO: Something to do with how we are building/displaying the texture
+    //
+    const flippedX = WIDTH - x
     const radius = brushSize || 10
 
     if (this.dustCount >= MAX_GRAINS && type !== 'eraser') return
@@ -831,7 +835,7 @@ export default class Dust {
 
     for (let r = 0; r < radius; r++) {
       for (let i = 0; i < 2 * Math.PI; i += step) {
-        const spawnX = x + Math.floor(r * Math.sin(i))
+        const spawnX = flippedX + Math.floor(r * Math.sin(i))
         const spawnY = y + Math.floor(r * Math.cos(i))
 
         if (spawnX <= 0 || spawnY <= 0 || spawnX >= WIDTH - 1 || spawnY >= HEIGHT - 1) continue
