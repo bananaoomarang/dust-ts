@@ -45,7 +45,11 @@ function App() {
     }
 
     const point = getSafeCoords(clientX - canvasNode.offsetLeft, clientY - canvasNode.offsetTop)
-    game.spawnCircle(point.x, point.y, selectedBrush, 10, false)
+
+    //
+    // TODO: something with how we are building the texture is reversing x lol
+    //
+    game.spawnCircle(500 - point.x, point.y, selectedBrush, 10, false)
   }, [selectedBrush])
 
   const handleMouseup = useCallback(() => {

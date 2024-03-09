@@ -51,46 +51,46 @@ function _create2dArray (width: number, height: number): number[][] {
 
 const MATERIALS: Record<string, Material> = {
   sand: {
-    color: [9, 7, 2],
+    color: [230, 179, 51],
     friction: 0.99,
     density: 10
   },
   oil: {
-    color: [5, 4, 1],
-    burnColors: [10, 4, 1, 8, 4, 1],
+    color: [128, 102, 26],
+    burnColors:  [255, 102, 26, 204, 102, 26 ],
     friction: 1,
     liquid: true,
     density: 5
   },
   fire: {
-    color: [10, 5, 0],
-    burnColors: [10, 5, 0, 9, 6, 1],
+    color: [255, 128, 0],
+    burnColors: [255, 128, 0, 230, 153, 26],
     friction: 1,
     density: -1
   },
   lava: {
-    color: [10, 3, 0],
+    color: [255, 77, 0],
     liquid: true,
     density: 10
   },
   C4: {
-    color: [2, 9, 1],
-    burnColors: [9, 7, 2, 10, 10, 3]
+    color: [51, 230, 26],
+    burnColors: [230, 179, 51, 255, 255, 77]
   },
   water: {
-    color: [0, 5, 10],
+    color: [0, 128, 255],
     friction: 1,
     liquid: true,
     density: 6
   },
   steam: {
-    color: [6, 6, 6],
+    color: [153, 153, 153],
     density: -1,
     liquid: true
   },
   life: {
-    color: [0, 10, 2],
-    burnColors: [10, 7, 1, 7, 6, 1]
+    color: [0, 255, 51],
+    burnColors: [255, 179, 26, 179, 153, 26]
   },
   solid: {
     color: [0, 0, 0]
@@ -104,10 +104,34 @@ const MATERIALS: Record<string, Material> = {
 export default class Dust {
   gl: WebGLRenderingContext
 
-
   timer = new Timer()
 
-  sandVertices = new Float32Array(MAX_GRAINS * 3 * 6)
+  sandVertices = new Float32Array([
+    0, 0,
+    0, 500,
+    500, 0,
+    500, 0,
+    0, 500,
+    500, 500
+  ])
+
+  texcoords = new Float32Array([
+    0, 1,
+    1, 1,
+    0, 0,
+
+    0, 0,
+    1, 1,
+    1, 0
+  ])
+
+  positionBuffer: WebGLBuffer
+  texcoordBuffer: WebGLBuffer
+  texture: WebGLTexture | null
+  textureLocation: WebGLUniformLocation | null
+  texcoordLocation: WebGLUniformLocation | null
+  textureData = new Uint8Array(500 * 500 * 4)
+
   grid = _create2dArray(WIDTH, HEIGHT)
   blacklist = _create2dArray(WIDTH, HEIGHT)
   explosions: Explosion[] = []
@@ -126,25 +150,45 @@ export default class Dust {
     gl.useProgram(shaderProgram)
 
     const projectionMatrix = glUtil.makeProjectionMatrix(WIDTH, HEIGHT)
-    const uModelViewProjectionMatrix = gl.getUniformLocation(shaderProgram, 'modelViewProjectionMatrix')
-    const dustBuffer = gl.createBuffer()
-    const positionAttribute = gl.getAttribLocation(shaderProgram, 'position')
-    const colorAttribute = gl.getAttribLocation(shaderProgram, 'aColor')
-    gl.enableVertexAttribArray(positionAttribute)
-    gl.enableVertexAttribArray(colorAttribute)
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, dustBuffer)
-
+    const uModelViewProjectionMatrix = gl.getUniformLocation(shaderProgram, 'uModelViewProjectionMatrix')
+    this.textureLocation = gl.getUniformLocation(shaderProgram, 'uTexture')
+    this.texcoordLocation = gl.getAttribLocation(shaderProgram, 'aTexCoord')
+    const positionAttribute = gl.getAttribLocation(shaderProgram, 'aPosition')
     const modelViewMatrix = [
       1, 0, 0,
       0, 1, 0,
       0, 0, 1
     ]
     const mvpMatrix = glUtil.matrixMultiply(modelViewMatrix, projectionMatrix)
-    gl.uniformMatrix3fv(uModelViewProjectionMatrix, false, mvpMatrix)
 
-    gl.vertexAttribPointer(positionAttribute, 2, gl.FLOAT, false, 12, 0)
-    gl.vertexAttribPointer(colorAttribute, 1, gl.FLOAT, false, 12, 8)
+    this.positionBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
+    gl.enableVertexAttribArray(positionAttribute)
+    gl.uniformMatrix3fv(uModelViewProjectionMatrix, false, mvpMatrix)
+    gl.vertexAttribPointer(positionAttribute, 2, gl.FLOAT, false, 0, 0)
+
+    this.texcoordBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer)
+    gl.enableVertexAttribArray(this.texcoordLocation)
+    gl.vertexAttribPointer(this.texcoordLocation, 2, gl.FLOAT, false, 0, 0)
+
+    this.texture = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, this.texture)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    if (!this.texture) {
+      throw new Error('Could not create texture')
+    }
+
+    const img = new Image()
+    img.addEventListener('load', () => {
+      gl.bindTexture(gl.TEXTURE_2D, this.texture)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+      document.body.appendChild(img)
+    })
+    // img.src = "/vite.svg"
   }
 
   move = (x1: number, y1: number, x2: number, y2: number) => {
@@ -278,19 +322,25 @@ export default class Dust {
   }
 
   draw = () => {
-    const { gl, sandVertices } = this
+    const { gl } = this
 
     let material
     let color
-    let vertexCount = 0
+    let offset = 0
 
     for (let x = 0; x < this.grid.length; x++) {
       for (let y = 0; y < this.grid[x].length; y++) {
         const s = this.grid[x][y]
+        const material = this.getMaterial(s)
+
+        this.textureData[offset] = material.color[0]
+        this.textureData[offset + 1] = material.color[1]
+        this.textureData[offset + 2] = material.color[2]
+        this.textureData[offset + 3] = 1
+
+        offset += 4
 
         if (s === 0) continue
-
-        material = this.getMaterial(s)
 
         if (s & BURNING && material.burnColors) {
           color = (Math.random() > 0.1)
@@ -299,42 +349,32 @@ export default class Dust {
         } else {
           color = material.color
         }
-
-        const offset = vertexCount * 3 * 6
-
-        if (vertexCount < MAX_GRAINS) {
-          this.sandVertices[offset] = x
-          this.sandVertices[offset + 1] = y
-          this.sandVertices[offset + 2] = _packColor(color)
-
-          this.sandVertices[offset + 3] = x + 1
-          this.sandVertices[offset + 4] = y
-          this.sandVertices[offset + 5] = _packColor(color)
-
-          this.sandVertices[offset + 6] = x
-          this.sandVertices[offset + 7] = y + 1
-          this.sandVertices[offset + 8] = _packColor(color)
-
-          this.sandVertices[offset + 9] = x
-          this.sandVertices[offset + 10] = y + 1
-          this.sandVertices[offset + 11] = _packColor(color)
-
-          this.sandVertices[offset + 12] = x + 1
-          this.sandVertices[offset + 13] = y
-          this.sandVertices[offset + 14] = _packColor(color)
-
-          this.sandVertices[offset + 15] = x + 1
-          this.sandVertices[offset + 16] = y + 1
-          this.sandVertices[offset + 17] = _packColor(color)
-
-          vertexCount++
-        }
       }
     }
 
     gl.clear(gl.COLOR_BUFFER_BIT)
-    gl.bufferData(gl.ARRAY_BUFFER, sandVertices, gl.STATIC_DRAW)
-    gl.drawArrays(gl.TRIANGLES, 0, vertexCount * 6)
+
+    gl.bindTexture(gl.TEXTURE_2D, this.texture)
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      WIDTH,
+      HEIGHT,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      this.textureData
+    );
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, this.sandVertices, gl.STATIC_DRAW)
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, this.texcoords, gl.STATIC_DRAW)
+
+    gl.uniform1i(this.textureLocation, 0)
+    gl.drawArrays(gl.TRIANGLES, 0, 6)
   }
 
   run = () => {

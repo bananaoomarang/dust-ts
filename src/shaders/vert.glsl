@@ -1,25 +1,14 @@
 precision mediump float;
 
-attribute vec2 position;
-attribute float aColor;
+attribute vec2 aPosition;
+attribute vec2 aTexCoord;
 
-uniform mat3 modelViewProjectionMatrix;
+uniform mat3 uModelViewProjectionMatrix;
 
 varying vec3 vColor;
-
-// Credit to 'AHM' on StackOverflow
-vec3 unpackColor(float f) {
-    vec3 color;
-
-    color.b = floor(f / (256.0 * 256.0));
-    color.g = floor((f - color.b * 256.0 * 256.0) / 256.0);
-    color.r = floor(mod(f, 256.0));
-
-    return color / 10.0;
-}
+varying vec2 vTexCoord;
 
 void main() {
-    vColor = unpackColor(aColor);
-
-    gl_Position = vec4(modelViewProjectionMatrix * vec3(position, 1.0), 1.0);
+    gl_Position = vec4(uModelViewProjectionMatrix * vec3(aPosition, 1.0), 1.0);
+    vTexCoord = aTexCoord;
 }
