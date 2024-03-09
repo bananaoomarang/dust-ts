@@ -51,7 +51,7 @@ const handleSpawnBrush = ({
   const { clientX, clientY } = getEventCoords(e)
   const point = getBrushCoords(
     clientX - canvasNode.offsetLeft,
-    clientY - canvasNode.offsetTop,
+    clientY - canvasNode.offsetTop + window.scrollY,
     canvasNode
   )
   game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
