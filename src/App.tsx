@@ -1,7 +1,9 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
+import classNames from 'classnames'
 import Dust from './Dust'
 import Point from './Point'
 import * as glUtil from './gl-util'
+import MaterialSelector from './MaterialSelector'
 import BrushSelector from './BrushSelector'
 import styles from './styles/App.module.css'
 
@@ -14,10 +16,12 @@ function getSafeCoords(x: number, y: number): Point {
 
 function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
+  const fpsLad = useRef<HTMLElement | null>(null)
   const dust = useRef<Dust | null>(null)
   const mousedown = useRef<boolean>(false)
   const [selectedBrush, setSelectedBrush] = useState('sand')
   const [infect, setInfect] = useState(false)
+  const [brushSize, setBrushSize] = useState(10)
 
   const handleMousedown = useCallback((e: MouseEvent) => {
     mousedown.current = true
@@ -30,8 +34,8 @@ function App() {
     }
 
     const point = getSafeCoords(offsetX, offsetY)
-    game.spawnCircle(point.x, point.y, selectedBrush, 10, infect)
-  }, [selectedBrush, infect])
+    game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+  }, [selectedBrush, infect, brushSize])
 
   const handleMousemove = useCallback((e: MouseEvent) => {
     const canvasNode = canvas.current
@@ -45,8 +49,8 @@ function App() {
     }
 
     const point = getSafeCoords(clientX - canvasNode.offsetLeft, clientY - canvasNode.offsetTop)
-    game.spawnCircle(point.x, point.y, selectedBrush, 10, false)
-  }, [selectedBrush])
+    game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+  }, [selectedBrush, infect, brushSize])
 
   const handleMouseup = useCallback(() => {
     mousedown.current = false
@@ -78,7 +82,7 @@ function App() {
     }
 
     const gl = glUtil.getGl(canvas.current)
-    const game = new Dust(gl)
+    const game = new Dust({ gl, fpsNode: fpsLad.current })
     game.run()
     dust.current = game
   }, [])
@@ -105,9 +109,14 @@ function App() {
   })
 
   return (
-    <div className={styles.wrapper}>
-      <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
-      <BrushSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
+    <div>
+      <h1 className={styles.header}>Dust</h1>
+      <div className={styles.wrapper}>
+        <span className={classNames(styles.fps, { [styles.show]: true })} ref={fpsLad}>0fps</span>
+        <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
+        <MaterialSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
+        <BrushSelector brushSize={brushSize} setBrushSize={setBrushSize} />
+      </div>
     </div>
   )
 }

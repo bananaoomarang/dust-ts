@@ -1,13 +1,13 @@
 export default class Timer {
-  start = new Date().getTime()
+  start = Date.now()
 
   getTime = (): number => {
-    const currentTime = new Date().getTime()
+    const currentTime = Date.now()
 
     return currentTime - this.start
   }
 
   reset = () => {
-    this.start = new Date().getTime()
+    this.start = Date.now()
   }
 }

@@ -1,85 +1,17 @@
 import styles from './styles/BrushSelector.module.css'
 
-const TYPES = [
-  {
-    label: 'Sand',
-    value: 'sand'
-  },
-  {
-    label: 'Oil',
-    value: 'oil'
-  },
-  {
-    label: 'Fire',
-    value: 'fire'
-  },
-  {
-    label: 'Water',
-    value: 'water'
-  },
-  {
-    label: 'Solid',
-    value: 'solid'
-  },
-  {
-    label: 'Lava',
-    value: 'lava'
-  },
-  {
-    label: 'Spring',
-    value: 'spring'
-  },
-  {
-    label: 'Volcanic',
-    value: 'volcanic'
-  },
-  {
-    label: 'Oil Well',
-    value: 'oil well'
-  },
-  {
-    label: 'Life Itself',
-    value: 'life'
-  },
-  {
-    label: 'C4 💥',
-    value: 'C4'
-  },
-  {
-    label: 'Eraser',
-    value: 'eraser'
-  }
-]
-
 interface BrushSelectorProps {
-  selected: string
-  setSelected: Function
-  infect: boolean
-  setInfect: Function
+  brushSize: number
+  setBrushSize: Function
 }
 
-function BrushSelector ({ selected, setSelected, infect, setInfect }: BrushSelectorProps) {
+export default function BrushSelector({ brushSize, setBrushSize }: BrushSelectorProps) {
   return (
-    <form className={styles.wrapper}>
-      {
-        TYPES.map(type => (
-          <label key={type.value}>
-            <input
-              type="radio"
-              value={type.value}
-              checked={selected === type.value}
-              onChange={() => setSelected(type.value)}
-            />
-            {type.label}
-          </label>
-        ))
-      }
+    <div className={styles.wrapper}>
       <label>
-        <input type="checkbox" checked={infect} onChange={() => setInfect(!infect)} />
-        Infectant
+        <div>Brush Size: {brushSize}</div>
+        <input type="range" min="1" max="200" value={brushSize} onChange={e => setBrushSize(e.target.value)} />
       </label>
-    </form>
+    </div>
   )
 }
-
-export default BrushSelector

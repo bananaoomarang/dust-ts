@@ -3,8 +3,26 @@
   justify-content: center;
   margin: 0 auto;
   max-width: 80rem;
+  align-content: flex-start;
+}
+
+.header {
+  text-align: center;
 }
 
 .canvas {
   border: 1px solid white;
+}
+
+.fps {
+  line-height: 1;
+  padding-right: 1rem;
+  opacity: 0;
+  transition: opacity 400ms ease-in-out;
+  width: 2.5rem;
+  font-weight: bold;
+}
+
+.show {
+  opacity: 1;
 }
