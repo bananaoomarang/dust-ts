@@ -15,7 +15,6 @@ const LAVA = 8
 const WATER = 16
 const STEAM = 32
 const SOLID = 64
-const RESTING = 128
 const BURNING = 256
 const LIFE = 512
 const INFECTANT = 1024
@@ -32,8 +31,18 @@ type Material = {
   liquid?: boolean
 }
 
-function _packColor (color: number[]) {
-  return color[0] + color[1] * 256 + color[2] * 256 * 256
+function _setPixel(
+  data: Uint8Array,
+  offset: number,
+  r: number,
+  g: number,
+  b: number,
+  a: number = 1
+) {
+  data[offset] = r
+  data[offset + 1] = g
+  data[offset + 2] = b
+  data[offset + 3] = a
 }
 
 function _create2dArray (width: number, height: number): number[][] {
@@ -101,10 +110,20 @@ const MATERIALS: Record<string, Material> = {
   }
 }
 
+interface DustConstructor {
+  gl: WebGLRenderingContext,
+  fpsNode: HTMLElement | null
+}
+
 export default class Dust {
   gl: WebGLRenderingContext
 
   timer = new Timer()
+  fpsTimer = new Timer()
+  frameCounter = 0
+
+  frameMetrics: Record<string, number>[] = []
+  shouldLogMetrics = false
 
   sandVertices = new Float32Array([
     0, 0,
@@ -143,8 +162,11 @@ export default class Dust {
 
   paused = false
 
-  constructor(gl: WebGLRenderingContext) {
+  fpsNode: HTMLElement | null
+
+  constructor({ gl, fpsNode }: DustConstructor) {
     this.gl = gl
+    this.fpsNode = fpsNode
 
     const shaderProgram = glUtil.getShaderProgram(gl, vertShader, fragShader)
     gl.useProgram(shaderProgram)
@@ -181,17 +203,50 @@ export default class Dust {
     if (!this.texture) {
       throw new Error('Could not create texture')
     }
-
-    const img = new Image()
-    img.addEventListener('load', () => {
-      gl.bindTexture(gl.TEXTURE_2D, this.texture)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
-      document.body.appendChild(img)
-    })
-    // img.src = "/vite.svg"
   }
 
-  move = (x1: number, y1: number, x2: number, y2: number) => {
+  run = () => {
+    const { timer, fpsTimer, fpsNode } = this
+    const startTime = new Date().getTime()
+
+    timer.reset()
+    if (!this.paused) {
+      this.update()
+    }
+    const updateTime = timer.getTime()
+
+    timer.reset()
+    this.draw()
+    const drawTime = timer.getTime()
+
+    this.frameCounter++
+    if (fpsTimer.getTime() > 1000) {
+      if (fpsNode) {
+        fpsNode.innerHTML = `${this.frameCounter}fps`
+      }
+      fpsTimer.reset()
+      this.frameCounter = 0
+
+      if (this.shouldLogMetrics) {
+        this.logMetrics()
+      }
+    }
+
+    if (this.frameMetrics.length > 10) {
+      this.frameMetrics = []
+    }
+
+    const totalTime = (new Date().getTime()) - startTime
+    this.frameMetrics.push({
+      total: totalTime,
+      update: updateTime,
+      draw: drawTime
+    })
+    window.requestAnimationFrame(this.run)
+  }
+
+
+  private move(x1: number, y1: number, x2: number, y2: number): void {
     if (
       x2 === 0 ||
       x2 >= WIDTH - 1 ||
@@ -206,11 +261,9 @@ export default class Dust {
     this.grid[x1][y1] = 0
     this.grid[x2][y2] = d
     this.blacklist[x1][y2] = 1
-
-    this.wakeSurrounds(x1, y1)
   }
 
-  swap = (x1: number, y1: number, x2: number, y2: number) => {
+  private swap(x1: number, y1: number, x2: number, y2: number): void {
     if (
       x2 === 0 ||
       x2 >= WIDTH - 1 ||
@@ -230,7 +283,7 @@ export default class Dust {
     this.blacklist[x2][y2] = 1
   }
 
-  update = () => {
+  private update() {
     let lived = false
 
     let rx = Math.floor(Math.random() * 500) % (this.grid.length - 1)
@@ -297,10 +350,6 @@ export default class Dust {
         this.updateWater(d, rx, ry)
         this.updateFloating(d, rx, ry, material, xDir)
 
-        if (d & RESTING) {
-          continue
-        }
-
         if (this.grid[rx][ry + 1] === 0) {
           this.move(rx, ry, rx, ry + 1)
         }
@@ -321,26 +370,23 @@ export default class Dust {
     }
   }
 
-  draw = () => {
+  private draw() {
     const { gl } = this
 
-    let material
     let color
     let offset = 0
 
     for (let x = 0; x < this.grid.length; x++) {
       for (let y = 0; y < this.grid[x].length; y++) {
         const s = this.grid[x][y]
+
+        if (s === 0) {
+          _setPixel(this.textureData, offset, 0, 0, 0, 0)
+          offset += 4
+          continue 
+        }
+
         const material = this.getMaterial(s)
-
-        this.textureData[offset] = material.color[0]
-        this.textureData[offset + 1] = material.color[1]
-        this.textureData[offset + 2] = material.color[2]
-        this.textureData[offset + 3] = 1
-
-        offset += 4
-
-        if (s === 0) continue
 
         if (s & BURNING && material.burnColors) {
           color = (Math.random() > 0.1)
@@ -349,6 +395,9 @@ export default class Dust {
         } else {
           color = material.color
         }
+
+        _setPixel(this.textureData, offset, color[0], color[1], color[2], 1)
+        offset += 4
       }
     }
 
@@ -377,18 +426,11 @@ export default class Dust {
     gl.drawArrays(gl.TRIANGLES, 0, 6)
   }
 
-  run = () => {
-    if (!this.paused) {
-      this.update()
-    }
-
-    this.draw()
-    this.timer.reset()
-
-    window.requestAnimationFrame(this.run)
+  private logMetrics(): void {
+    console.log(this.frameMetrics)
   }
 
-  updateSprings = (cellValue: number, x: number, y: number) => {
+  private updateSprings(cellValue: number, x: number, y: number): void {
     //
     // This is a spring
     //
@@ -411,23 +453,18 @@ export default class Dust {
     }
   }
 
-  updateExplosions = () => {
-    for (let e = 0; e < this.explosions.length; e++) {
-      const exp = this.explosions[e]
-
+  private updateExplosions(): void {
+    for (const exp of this.explosions) {
       if (!exp.updated) {
         exp.update()
         this.spawnCircle(exp.x, exp.y, FIRE, exp.radius)
       }
-
-      if (exp.force === 0) {
-        this.explosions.splice(e, 1)
-        e--
-      }
     }
+
+    this.explosions = this.explosions.filter(exp => exp.force !== 0)
   }
 
-  updateLife = (x: number, y: number): boolean => {
+  private updateLife(x: number, y: number): boolean {
     const self = this
     let lived = false
 
@@ -460,7 +497,7 @@ export default class Dust {
     return lived
   }
 
-  updateInfections = (cellValue: number, x: number, y: number) => {
+  private updateInfections(cellValue: number, x: number, y: number): void {
     const self = this
 
     if (!this.surrounded(x, y)) {
@@ -487,7 +524,7 @@ export default class Dust {
   //
   // Handle fire, burning and things of that nature
   //
-  updateFire = (cellValue: number, x: number, y: number) => {
+  private updateFire(cellValue: number, x: number, y: number): void {
     if (cellValue & FIRE && Math.random() > 0.8) {
       this.grid[x][y] |= BURNING
     }
@@ -514,7 +551,7 @@ export default class Dust {
     }
   }
 
-  updateWater = (cellValue: number, x: number, y: number) => {
+  private updateWater(cellValue: number, x: number, y: number): void {
     //
     // Chance that steam will condense + it will condense if it's surrounded by steam
     //
@@ -538,7 +575,7 @@ export default class Dust {
   //
   // Handle changes due to material density
   //
-  updateFloating = (cellValue: number, x: number, y: number, material: Material, xDir: number) => {
+  private updateFloating(cellValue: number, x: number, y: number, material: Material, xDir: number): void {
     const materialAbove = this.getMaterial(
       this.grid[x][y - 1]
     )
@@ -566,7 +603,7 @@ export default class Dust {
   //
   // NB This code is paraphrased from http://pok5.de/elementdots/js/dots.js, so full credit where it's due.
   //
-  updateGeneric = (x: number, y: number, material: Material, xDir: number) => {
+  private updateGeneric(x: number, y: number, material: Material, xDir: number): void {
     if (material.liquid && x + 3 < WIDTH && x - 3 > 0) {
       const r1 = this.grid[x + 1][y]
       const r2 = this.grid[x + 2][y]
@@ -598,16 +635,11 @@ export default class Dust {
     } else {
       if (this.grid[x + xDir][y + 1] === 0) {
         this.move(x, y, x + xDir, y + 1)
-      } else if (this.shouldLieDown(x, y)) {
-        //
-        // Check if the particle should be RESTING
-        //
-        this.grid[x][y] |= RESTING
-      }
+      } 
     }
   }
 
-  getMaterial = (s: number) => {
+  private getMaterial(s: number): Material {
     if (s === 0) return MATERIALS.space
     if (s & SAND) return MATERIALS.sand
     if (s & OIL) return MATERIALS.oil
@@ -622,7 +654,7 @@ export default class Dust {
     return MATERIALS.space
   }
 
-  clearBlacklist = () => {
+  private clearBlacklist(): void {
     for (let x = 0; x < this.blacklist.length; x++) {
       for (let y = 0; y < this.blacklist[x].length; y++) {
         this.blacklist[x][y] = 0
@@ -630,17 +662,7 @@ export default class Dust {
     }
   }
 
-  wakeSurrounds = (x: number, y: number) => {
-    if (this.grid[x][y] & RESTING) this.grid[x][y] ^= RESTING
-    if (this.grid[x][y - 1] & RESTING) this.grid[x][y - 1] ^= RESTING
-    if (this.grid[x + 1][y] & RESTING) this.grid[x + 1][y] ^= RESTING
-    if (this.grid[x][y + 1] & RESTING) this.grid[x][y + 1] ^= RESTING
-    if (this.grid[x - 1][y] & RESTING) this.grid[x - 1][y] ^= RESTING
-    if (this.grid[x + 1][y + 1] & RESTING) this.grid[x + 1][y + 1] ^= RESTING
-    if (this.grid[x - 1][y + 1] & RESTING) this.grid[x - 1][y + 1] ^= RESTING
-  }
-
-  spawn = (x: number, y: number, type: number) => {
+  private spawn(x: number, y: number, type: number): void {
     if (x === 0 || x === WIDTH - 1 || y === 0 || y === HEIGHT - 1 || this.grid[x][y] & type) return
 
     if (this.dustCount <= MAX_GRAINS && this.grid[x][y] === 0) {
@@ -648,25 +670,21 @@ export default class Dust {
 
       this.grid[x][y] = type
       this.blacklist[x][y] = 1
-      this.wakeSurrounds(x, y)
     } else if (this.grid[x][y] !== 0) {
       this.grid[x][y] = type
       this.blacklist[x][y] = 1
-      this.wakeSurrounds(x, y)
     }
   }
 
-  destroy = (x: number, y: number) => {
+  private destroy(x: number, y: number): void {
     if (this.grid[x][y] !== 0) {
       this.dustCount--
 
       this.grid[x][y] = 0
-
-      this.wakeSurrounds(x, y)
     }
   }
 
-  infect = (x: number, y: number, flagSet: number, flagToSet: number, flagToRemove?: number) => {
+  private infect(x: number, y: number, flagSet: number, flagToSet: number, flagToRemove?: number): void {
     const n = this.grid[x][y - 1]
     const ne = this.grid[x + 1][y - 1]
     const e = this.grid[x + 1][y]
@@ -721,7 +739,7 @@ export default class Dust {
     }
   }
 
-  surrounded = (x: number, y: number) => {
+  private surrounded(x: number, y: number): boolean {
     if (this.grid[x][y] === (this.grid[x + 1][y] && this.grid[x - 1][y] && this.grid[x][y + 1] &&
       this.grid[x][y - 1] && this.grid[x + 1][y + 1] && this.grid[x + 1][y - 1] && this.grid[x - 1][y + 1] && this.grid[x - 1][y - 1])) { return true } else { return false }
   }
@@ -729,7 +747,7 @@ export default class Dust {
   //
   // Runs a function on surrounding particles providing a flag is set
   //
-  runOnSurrounds = (x: number, y: number, f: (x: number, y: number) => void, flag?: number) => {
+  private runOnSurrounds(x: number, y: number, f: (x: number, y: number) => void, flag?: number): void {
     const n = this.grid[x][y - 1]
     const ne = this.grid[x + 1][y - 1]
     const e = this.grid[x + 1][y]
@@ -760,7 +778,7 @@ export default class Dust {
     }
   }
 
-  countNeighbours = (x: number, y: number, exclusive: boolean = false) => {
+  private countNeighbours(x: number, y: number, exclusive: boolean = false): number {
     const d = this.grid[x][y]
     const n = this.grid[x][y - 1]
     const ne = this.grid[x + 1][y - 1]
@@ -797,22 +815,9 @@ export default class Dust {
     return count
   }
 
-  shouldLieDown = (x: number, y: number) => {
-    if (!this.surrounded(x, y)) return false
-
-    while (y <= HEIGHT) {
-      if (this.grid[x][y] & SOLID) {
-        return true
-      } else if (this.grid[x][y] === 0) {
-        return false
-      }
-
-      y++
-    }
-  }
-
-  explode = (x: number, y: number, f: number, r: number) => {
-    const explosion = new Explosion(x, y, f, r)
+  private explode(x: number, y: number, f: number, r: number) {
+    const flippedX = WIDTH - x
+    const explosion = new Explosion(flippedX, y, f, r)
     this.explosions.push(explosion)
   }
 
@@ -845,14 +850,13 @@ export default class Dust {
         } else {
           if (this.grid[spawnX][spawnY] !== 0) {
             this.destroy(spawnX, spawnY)
-            this.wakeSurrounds(spawnX, spawnY)
           }
         }
       }
     }
   }
 
-  getType = (typeString: string): number => {
+  private getType(typeString: string): number {
     switch (typeString) {
       case 'eraser':
         return 0

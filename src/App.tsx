@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
+import classNames from 'classnames'
 import Dust from './Dust'
 import Point from './Point'
 import * as glUtil from './gl-util'
@@ -14,6 +15,7 @@ function getSafeCoords(x: number, y: number): Point {
 
 function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
+  const fpsLad = useRef<HTMLElement | null>(null)
   const dust = useRef<Dust | null>(null)
   const mousedown = useRef<boolean>(false)
   const [selectedBrush, setSelectedBrush] = useState('sand')
@@ -79,7 +81,7 @@ function App() {
     }
 
     const gl = glUtil.getGl(canvas.current)
-    const game = new Dust(gl)
+    const game = new Dust({ gl, fpsNode: fpsLad.current })
     game.run()
     dust.current = game
   }, [])
@@ -107,6 +109,7 @@ function App() {
 
   return (
     <div className={styles.wrapper}>
+      <span className={classNames(styles.fps, { [styles.show]: true })} ref={fpsLad}>0fps</span>
       <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
       <BrushSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
     </div>

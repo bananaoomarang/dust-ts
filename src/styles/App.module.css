@@ -8,3 +8,14 @@
 .canvas {
   border: 1px solid white;
 }
+
+.fps {
+  padding-right: 1rem;
+  opacity: 0;
+  transition: opacity 400ms ease-in-out;
+  width: 2.5rem;
+}
+
+.show {
+  opacity: 1;
+}
