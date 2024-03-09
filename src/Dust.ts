@@ -118,12 +118,8 @@ interface DustConstructor {
 export default class Dust {
   gl: WebGLRenderingContext
 
-  timer = new Timer()
   fpsTimer = new Timer()
   frameCounter = 0
-
-  frameMetrics: Record<string, number>[] = []
-  shouldLogMetrics = false
 
   sandVertices = new Float32Array([
     0, 0,
@@ -144,8 +140,8 @@ export default class Dust {
     1, 0
   ])
 
-  positionBuffer: WebGLBuffer
-  texcoordBuffer: WebGLBuffer
+  positionBuffer: WebGLBuffer | null
+  texcoordBuffer: WebGLBuffer | null
   texture: WebGLTexture | null
   textureLocation: WebGLUniformLocation | null
   texcoordLocation: WebGLUniformLocation | null
@@ -191,8 +187,8 @@ export default class Dust {
 
     this.texcoordBuffer = gl.createBuffer()
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texcoordBuffer)
-    gl.enableVertexAttribArray(this.texcoordLocation)
-    gl.vertexAttribPointer(this.texcoordLocation, 2, gl.FLOAT, false, 0, 0)
+    gl.enableVertexAttribArray(this.texcoordLocation as number)
+    gl.vertexAttribPointer(this.texcoordLocation as number, 2, gl.FLOAT, false, 0, 0)
 
     this.texture = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
@@ -206,18 +202,13 @@ export default class Dust {
   }
 
   run = () => {
-    const { timer, fpsTimer, fpsNode } = this
-    const startTime = new Date().getTime()
+    const { fpsTimer, fpsNode } = this
 
-    timer.reset()
     if (!this.paused) {
       this.update()
     }
-    const updateTime = timer.getTime()
 
-    timer.reset()
     this.draw()
-    const drawTime = timer.getTime()
 
     this.frameCounter++
     if (fpsTimer.getTime() > 1000) {
@@ -226,22 +217,8 @@ export default class Dust {
       }
       fpsTimer.reset()
       this.frameCounter = 0
-
-      if (this.shouldLogMetrics) {
-        this.logMetrics()
-      }
     }
 
-    if (this.frameMetrics.length > 10) {
-      this.frameMetrics = []
-    }
-
-    const totalTime = (new Date().getTime()) - startTime
-    this.frameMetrics.push({
-      total: totalTime,
-      update: updateTime,
-      draw: drawTime
-    })
     window.requestAnimationFrame(this.run)
   }
 
@@ -332,7 +309,7 @@ export default class Dust {
         this.updateExplosions()
 
         if (d & INFECTANT) {
-          this.updateInfections(d, rx, ry)
+          this.updateInfections(rx, ry)
         }
 
         if (d & LIFE) {
@@ -396,7 +373,7 @@ export default class Dust {
           color = material.color
         }
 
-        _setPixel(this.textureData, offset, color[0], color[1], color[2], 1)
+        _setPixel(this.textureData, offset, color[0], color[1], color[2], 255)
         offset += 4
       }
     }
@@ -426,10 +403,6 @@ export default class Dust {
     gl.drawArrays(gl.TRIANGLES, 0, 6)
   }
 
-  private logMetrics(): void {
-    console.log(this.frameMetrics)
-  }
-
   private updateSprings(cellValue: number, x: number, y: number): void {
     //
     // This is a spring
@@ -454,6 +427,10 @@ export default class Dust {
   }
 
   private updateExplosions(): void {
+    if (!this.explosions.length) {
+      return
+    }
+
     for (const exp of this.explosions) {
       if (!exp.updated) {
         exp.update()
@@ -464,61 +441,70 @@ export default class Dust {
     this.explosions = this.explosions.filter(exp => exp.force !== 0)
   }
 
+  private onWaterSurrounds = (x: number, y: number) => this.destroy(x, y)
+  private onLifeSurrounds = (x: number, y: number) => {
+    if (
+      x <= 1 ||
+      x >= WIDTH - 1 ||
+      y <= 1 ||
+      y >= HEIGHT - 1 ||
+      this.blacklist[x][y] ||
+      this.grid[x][y] !== 0
+    ) {
+      return
+    }
+
+    const neighbours = this.countNeighbours(x, y)
+
+    if (neighbours === 3) {
+      this.spawn(x, y, LIFE)
+    }
+
+    //
+    // Not a misatake, this makes it work better
+    //
+    this.blacklist[x][y] = 1
+  }
+
+  private onInfectSurrounds = (x: number, y: number, cellValue: number) => {
+    const cell = this.grid[x][y]
+
+    if (cell & INFECTANT) {
+      return
+    }
+
+    if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
+      const rand = Math.random()
+
+      if (cell !== 0 && rand > 0.91) {
+        this.spawn(x, y, cellValue)
+      }
+    }
+  }
+
   private updateLife(x: number, y: number): boolean {
-    const self = this
     let lived = false
 
     if (this.lifeTimer.getTime() >= this.lifeTime) {
       lived = true
 
-      let neighbours = this.countNeighbours(x, y, true)
+      const neighbours = this.countNeighbours(x, y, true)
 
       if (neighbours < 2) this.destroy(x, y)
       if (neighbours > 3) this.destroy(x, y)
 
-      this.runOnSurrounds(x, y, function (x, y) {
-        if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
-          if (!self.blacklist[x][y] && self.grid[x][y] === 0) {
-            neighbours = self.countNeighbours(x, y)
-
-            if (neighbours === 3) {
-              self.spawn(x, y, LIFE)
-            }
-
-            //
-            // Not a misatake, this makes it work better
-            //
-            self.blacklist[x][y] = 1
-          }
-        }
-      })
+      this.runOnSurrounds(x, y, this.onLifeSurrounds)
     }
 
     return lived
   }
 
-  private updateInfections(cellValue: number, x: number, y: number): void {
-    const self = this
-
-    if (!this.surrounded(x, y)) {
+  private updateInfections(x: number, y: number): void {
+    if (this.surrounded(x, y)) {
       return
     }
 
-    this.runOnSurrounds(x, y, function (x, y) {
-      const cell = self.grid[x][y]
-
-      if (cell & INFECTANT) {
-        return
-      }
-
-      if (x > 1 && x < WIDTH - 1 && y > 1 && y < HEIGHT - 1) {
-        const rand = Math.random()
-
-        if (cell !== 0 && rand > 0.91) {
-          self.spawn(x, y, cellValue)
-        }
-      }
-    })
+    this.runOnSurrounds(x, y, this.onInfectSurrounds)
   }
 
   //
@@ -567,7 +553,7 @@ export default class Dust {
     // Put out fires
     //
     if (cellValue & WATER && Math.random() > 0.5) {
-      this.runOnSurrounds(x, y, this.destroy, FIRE)
+      this.runOnSurrounds(x, y, this.onWaterSurrounds, FIRE)
       this.infect(x, y, BURNING, BURNING)
     }
   }
@@ -579,23 +565,21 @@ export default class Dust {
     const materialAbove = this.getMaterial(
       this.grid[x][y - 1]
     )
-    const materialAboveSide = this.getMaterial(
-      this.grid[x + xDir][y - 1]
-    )
 
     if (
-      typeof material.density !== 'undefined' && 
-        typeof materialAbove.density !== 'undefined' &&
-        typeof materialAboveSide.density !== 'undefined'
+      typeof material.density === 'undefined' ||
+      typeof materialAbove.density === 'undefined'
     ) {
-      if (material.density < materialAbove.density) {
-        if (cellValue & FIRE) {
-          this.swap(x, y, x, y - 1)
-        } else if (Math.random() < 0.7) {
-          this.swap(x, y, x + xDir, y - 1)
-        } else if (Math.random() < 0.7) {
-          this.swap(x, y, x, y - 1)
-        }
+      return
+    }
+
+    if (material.density < materialAbove.density) {
+      if (cellValue & FIRE) {
+        this.swap(x, y, x, y - 1)
+      } else if (Math.random() < 0.7) {
+        this.swap(x, y, x + xDir, y - 1)
+      } else {
+        this.swap(x, y, x, y - 1)
       }
     }
   }
@@ -740,14 +724,30 @@ export default class Dust {
   }
 
   private surrounded(x: number, y: number): boolean {
-    if (this.grid[x][y] === (this.grid[x + 1][y] && this.grid[x - 1][y] && this.grid[x][y + 1] &&
-      this.grid[x][y - 1] && this.grid[x + 1][y + 1] && this.grid[x + 1][y - 1] && this.grid[x - 1][y + 1] && this.grid[x - 1][y - 1])) { return true } else { return false }
+    const cell = this.grid[x][y]
+    return !!(
+      cell === this.grid[x + 1][y] &&
+      cell === this.grid[x - 1][y] &&
+      cell === this.grid[x][y + 1] &&
+      cell === this.grid[x][y - 1] &&
+      cell === this.grid[x + 1][y + 1] &&
+      cell === this.grid[x + 1][y - 1] &&
+      cell === this.grid[x - 1][y + 1] &&
+      cell === this.grid[x - 1][y - 1]
+    )
   }
 
   //
   // Runs a function on surrounding particles providing a flag is set
   //
-  private runOnSurrounds(x: number, y: number, f: (x: number, y: number) => void, flag?: number): void {
+  private runOnSurrounds(
+    x: number,
+    y: number,
+    f: (x: number, y: number, cellValue: number) => void,
+    flag?: number
+  ): void {
+    const cellValue = this.grid[x][y]
+
     const n = this.grid[x][y - 1]
     const ne = this.grid[x + 1][y - 1]
     const e = this.grid[x + 1][y]
@@ -758,23 +758,23 @@ export default class Dust {
     const nw = this.grid[x - 1][y - 1]
 
     if (flag) {
-      if (n & flag) f(x, y - 1)
-      if (ne & flag) f(x + 1, y - 1)
-      if (e & flag) f(x + 1, y)
-      if (se & flag) f(x + 1, y + 1)
-      if (s & flag) f(x, y + 1)
-      if (sw & flag) f(x - 1, y + 1)
-      if (w & flag) f(x - 1, y)
-      if (nw & flag) f(x - 1, y - 1)
+      if (n & flag) f(x, y - 1, cellValue)
+      if (ne & flag) f(x + 1, y - 1, cellValue)
+      if (e & flag) f(x + 1, y, cellValue)
+      if (se & flag) f(x + 1, y + 1, cellValue)
+      if (s & flag) f(x, y + 1, cellValue)
+      if (sw & flag) f(x - 1, y + 1, cellValue)
+      if (w & flag) f(x - 1, y, cellValue)
+      if (nw & flag) f(x - 1, y - 1, cellValue)
     } else {
-      f(x, y - 1)
-      f(x + 1, y - 1)
-      f(x + 1, y)
-      f(x + 1, y + 1)
-      f(x, y + 1)
-      f(x - 1, y + 1)
-      f(x - 1, y)
-      f(x - 1, y - 1)
+      f(x, y - 1, cellValue)
+      f(x + 1, y - 1, cellValue)
+      f(x + 1, y, cellValue)
+      f(x + 1, y + 1, cellValue)
+      f(x, y + 1, cellValue)
+      f(x - 1, y + 1, cellValue)
+      f(x - 1, y, cellValue)
+      f(x - 1, y - 1, cellValue)
     }
   }
 
