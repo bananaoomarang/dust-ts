@@ -1,35 +1,76 @@
 .wrapper {
+  width: 100%;
+  max-width: 500px;
+
+  @media (--break-large) {
+    width: auto;
+  }
+}
+
+.types,
+.modifiers {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  border-top: 1px solid white;
   height: fit-content;
   user-select: none;
   box-sizing: border-box;
-  max-width: 500px;
   width: 100%;
+  margin: 0 auto;
   margin-top: 1rem;
+  overflow: hidden;
 
   @media (--break-large) {
     border: 1px solid white;
     border-left: none;
     max-width: 16rem;
     border-radius: 0 0 8px 0;
-    margin-top: 0;
+    margin: 0;
   }
 }
 
-.label {
+.modifiers {
+  margin-top: 1rem;
+
+  @media (--break-large) {
+    border-radius: 0 8px 8px 0;
+  }
+}
+
+.button {
   display: grid;
   grid-template-columns: 2fr 1fr;
   font-weight: bold;
-  padding: 0.25rem 0;
+  padding: 1rem;
+  cursor: pointer;
+  transition: background-color 200ms ease-in-out;
+  outline: none;
+  border: none;
+  border-radius: 0;
+  text-align: left;
+
+  @media (--break-large) {
+    padding: 0.25rem 1rem;
+  }
 }
 
-.labelText {
-  padding-left: 0.25rem;
+.button:hover,
+.button:focus {
+  background-color: #545454;
+}
+
+.selected,
+.selected:hover,
+.selected:focus {
+  background-color: #3688c7;
 }
 
 .emoji {
   margin-left: auto;
+  font-size: 1.25rem;
+}
+
+.input[type=radio] {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
 }

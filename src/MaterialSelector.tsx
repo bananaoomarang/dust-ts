@@ -1,3 +1,5 @@
+import { AriaRole, MouseEventHandler, useRef } from 'react'
+import classNames from 'classnames'
 import { BrushModifier, BrushType } from './dust/Dust'
 import styles from './styles/MaterialSelector.module.css'
 
@@ -70,9 +72,11 @@ const TYPES: BrushSelectorType[] = [
   }
 ]
 
-interface LabelProps {
+interface RowProps {
   type: BrushSelectorType
-  inputProps: Record<string, any>
+  selected: boolean
+  onClick: MouseEventHandler<HTMLButtonElement>
+  role: AriaRole
 }
 
 interface MaterialSelectorProps {
@@ -82,49 +86,55 @@ interface MaterialSelectorProps {
   setInfect: Function
 }
 
-const Label = ({ type, inputProps }: LabelProps) => (
-  <label className={styles.label}>
-    <span>
-      <input
-        className={styles.input}
-        type="radio"
-        {...inputProps}
-      />
+const Row = ({ type, selected, onClick, role }: RowProps) => {
+  const ref = useRef(null)
+
+  return (
+    <button
+      ref={ref}
+      className={classNames(styles.button, { [styles.selected]: selected })}
+      onClick={onClick}
+      role={role}
+    >
       <span className={styles.labelText}>{type.label}</span>
-    </span>
-    {type.emoji && <span className={styles.emoji}>{type.emoji}</span>}
-  </label>
-)
+      {type.emoji && <span className={styles.emoji}>{type.emoji}</span>}
+    </button>
+  )
+}
+
+Row.defaultProps = { role: "button" }
 
 function BrushSelector ({ selected, setSelected, infect, setInfect }: MaterialSelectorProps) {
   return (
-    <form className={styles.wrapper}>
-      {
-        TYPES.map(type => (
-          <Label
-            key={type.value}
-            type={type}
-            inputProps={{
-              checked: selected === type.value,
-              onChange: () => setSelected(type.value),
-              value: type.value
-            }}
-          />
-        ))
-      }
-      <Label
-        type={{
-          label: 'Infectant',
-          value: 'infectant',
-          emoji: '🦠'
-        }}
-        inputProps={{
-          type: 'checkbox',
-          checked: infect,
-          onChange: () => setInfect(!infect)
-        }}
-      />
-    </form>
+    <div className={styles.wrapper}>
+      <div className={styles.types}>
+        {
+          TYPES.map(type => (
+            <Row
+              key={type.value}
+              type={type}
+              selected={selected === type.value}
+              onClick={() => setSelected(type.value)}
+            />
+          ))
+        }
+      </div>
+      <div className={styles.modifiers}>
+        <Row
+          type={{
+            label: 'Infectant',
+            value: 'infectant',
+            emoji: '🦠'
+          }}
+          selected={infect}
+          onClick={_ => {
+            document.activeElement && (document.activeElement as HTMLButtonElement).blur()
+            setInfect(!infect)
+          }}
+          role='switch'
+        />
+      </div>
+    </div>
   )
 }
 
