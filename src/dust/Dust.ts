@@ -218,6 +218,8 @@ export default class Dust {
   run = () => {
     const { fpsTimer, fpsNode } = this
 
+    this.handleMice()
+
     if (!this.paused) {
       this.update()
     }
@@ -279,8 +281,6 @@ export default class Dust {
 
     let rx = Math.floor(Math.random() * 500) % (this.grid.length - 1)
     const xIncrement = 8
-
-    this.handleMice()
 
     for (let x = 1; x < this.grid.length - 1; x++) {
       const yLen = this.grid[x].length - 1
@@ -887,6 +887,10 @@ export default class Dust {
         }
       }
     }
+  }
+
+  clearLevel = (): void => {
+    this.grid = _create2dArray(WIDTH, HEIGHT)
   }
 
   private getType(typeString: BrushType): number {

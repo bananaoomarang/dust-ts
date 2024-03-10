@@ -135,6 +135,10 @@ function App() {
     if (e.key === ' ') {
       game.paused = !game.paused
     }
+
+    if (e.key === 'r') {
+      game.clearLevel()
+    }
   }, [])
 
   useEffect(() => {
