@@ -1,12 +1,13 @@
+import { BrushModifier, BrushType } from './dust/Dust'
 import styles from './styles/MaterialSelector.module.css'
 
-type BrushType = {
+type BrushSelectorType = {
   label: string
-  value?: string
+  value: BrushType | BrushModifier
   emoji: string
 }
 
-const TYPES: BrushType[] = [
+const TYPES: BrushSelectorType[] = [
   {
     label: 'Sand',
     value: 'sand',
@@ -64,18 +65,18 @@ const TYPES: BrushType[] = [
   },
   {
     label: 'Eraser',
-    value: 'eraser',
+    value: 'space',
     emoji: '🫥'
   }
 ]
 
 interface LabelProps {
-  type: BrushType
+  type: BrushSelectorType
   inputProps: Record<string, any>
 }
 
 interface MaterialSelectorProps {
-  selected: string
+  selected: BrushType
   setSelected: Function
   infect: boolean
   setInfect: Function
@@ -114,6 +115,7 @@ function BrushSelector ({ selected, setSelected, infect, setInfect }: MaterialSe
       <Label
         type={{
           label: 'Infectant',
+          value: 'infectant',
           emoji: '🦠'
         }}
         inputProps={{

@@ -31,10 +31,14 @@ type Material = {
   liquid?: boolean
 }
 
+export type BrushType = "sand" | "oil" | "fire" | "lava" | "water" | "steam" | "solid" | "life" | "C4" | "spring" | "volcanic" | "oil well" | "space"
+
+export type BrushModifier = "burning" | "infectant"
+
 type Brush  = {
   x: number
   y: number
-  type: string | number
+  type: BrushType
   size: number
   infect?: boolean
 }
@@ -452,7 +456,7 @@ export default class Dust {
     for (const exp of this.explosions) {
       if (!exp.updated) {
         exp.update()
-        this.spawnCircle({ x: exp.x, y: exp.y, type: FIRE, size: exp.radius })
+        this.spawnCircle({ x: exp.x, y: exp.y, type: 'fire', size: exp.radius })
       }
     }
 
@@ -857,13 +861,13 @@ export default class Dust {
     const flippedX = WIDTH - x
     const radius = size || 10
 
-    if (this.dustCount >= MAX_GRAINS && type !== 'eraser') return
+    if (this.dustCount >= MAX_GRAINS && type !== 'space') return
 
     let nType = typeof type === 'string' ? this.getType(type) : type
     const segments = 500
     const step = (2 * Math.PI) / segments
 
-    if (infect && type !== 'eraser') {
+    if (infect && type !== 'space') {
       nType = (INFECTANT | nType)
     }
 
@@ -885,9 +889,9 @@ export default class Dust {
     }
   }
 
-  private getType(typeString: string): number {
+  private getType(typeString: BrushType): number {
     switch (typeString) {
-      case 'eraser':
+      case 'space':
         return 0
       case 'sand':
         return SAND

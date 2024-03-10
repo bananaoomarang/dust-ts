@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import classNames from 'classnames'
-import Dust from './dust/Dust'
+import Dust, { BrushType } from './dust/Dust'
 import Point from './dust/Point'
 import * as glUtil from './dust/gl-util'
 import MaterialSelector from './MaterialSelector'
@@ -44,7 +44,7 @@ interface HandleSpawnOpts {
   game: Dust
   canvasNode: HTMLCanvasElement
   e: MouseEvent | TouchEvent
-  selectedBrush: string
+  selectedBrush: BrushType
   brushSize: number
   infect: boolean
 }
@@ -73,7 +73,7 @@ function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const fpsLad = useRef<HTMLElement | null>(null)
   const dust = useRef<Dust | null>(null)
-  const [selectedBrush, setSelectedBrush] = useState('sand')
+  const [selectedBrush, setSelectedBrush] = useState<BrushType>('sand')
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
 
