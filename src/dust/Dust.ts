@@ -31,6 +31,14 @@ type Material = {
   liquid?: boolean
 }
 
+type Brush  = {
+  x: number
+  y: number
+  type: string | number
+  size: number
+  infect?: boolean
+}
+
 function _setPixel(
   data: Uint8Array,
   offset: number,
@@ -110,14 +118,6 @@ const MATERIALS: Record<string, Material> = {
   }
 }
 
-type Mouse = {
-  x: number
-  y: number
-  brush: string
-  brushSize: number
-  infect: boolean
-}
-
 interface DustConstructor {
   gl: WebGLRenderingContext,
   fpsNode: HTMLElement | null
@@ -168,7 +168,7 @@ export default class Dust {
 
   fpsNode: HTMLElement | null
 
-  activeMice: Record<number, Mouse> = {}
+  activeBrushes: Record<number, Brush> = {}
 
   constructor({ gl, fpsNode }: DustConstructor) {
     this.gl = gl
@@ -416,8 +416,8 @@ export default class Dust {
   }
 
   private handleMice(): void {
-    for (const [_, mouse] of Object.entries(this.activeMice)) {
-      this.spawnCircle(mouse.x, mouse.y, mouse.brush, mouse.brushSize, mouse.infect)
+    for (const [_, brush] of Object.entries(this.activeBrushes)) {
+      this.spawnCircle(brush)
     }
   }
 
@@ -452,7 +452,7 @@ export default class Dust {
     for (const exp of this.explosions) {
       if (!exp.updated) {
         exp.update()
-        this.spawnCircle(exp.x, exp.y, FIRE, exp.radius)
+        this.spawnCircle({ x: exp.x, y: exp.y, type: FIRE, size: exp.radius })
       }
     }
 
@@ -839,27 +839,23 @@ export default class Dust {
     this.explosions.push(explosion)
   }
 
-  mousedown = (
+  addBrush = (
     id: number,
-    x: number,
-    y: number,
-    selectedBrush: string,
-    brushSize: number,
-    infect: boolean
+    brush: Brush
   ) => {
-    this.activeMice[id] = { x, y, brush: selectedBrush, brushSize, infect }
+    this.activeBrushes[id] = brush
   }
 
-  mouseup = (id: number) => {
-    delete this.activeMice[id]
+  removeBrush = (id: number) => {
+    delete this.activeBrushes[id]
   }
 
-  spawnCircle = (x: number, y: number, type: string | number, brushSize: number, infect: boolean = false) => {
+  spawnCircle = ({ x, y, type, size, infect }: Brush) => {
     //
     // TODO: Something to do with how we are building/displaying the texture
     //
     const flippedX = WIDTH - x
-    const radius = brushSize || 10
+    const radius = size || 10
 
     if (this.dustCount >= MAX_GRAINS && type !== 'eraser') return
 

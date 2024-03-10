@@ -65,8 +65,7 @@ const handleSpawnBrush = ({
       y - canvasNode.offsetTop + window.scrollY,
       canvasNode
     )
-    //game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
-    game.mousedown(id, point.x, point.y, selectedBrush, brushSize, infect)
+    game.addBrush(id, { x: point.x, y: point.y, type: selectedBrush, size: brushSize, infect })
   }
 }
 
@@ -113,10 +112,10 @@ function App() {
     }
 
     if (e instanceof MouseEvent) {
-      game.mouseup(0)
+      game.removeBrush(0)
     } else {
       for (const touch of e.changedTouches) {
-        game.mouseup(touch.identifier)
+        game.removeBrush(touch.identifier)
       }
     }
   }, [])
