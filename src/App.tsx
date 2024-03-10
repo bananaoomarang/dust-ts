@@ -23,11 +23,20 @@ function getBrushCoords(
   return point
 }
 
-function getEvents(e: MouseEvent | TouchEvent): MouseEvent[] | TouchList {
+function getEvents(e: MouseEvent | TouchEvent): { id: number, x: number, y: number }[] {
   if (e instanceof MouseEvent) {
-    return [e]
+    return [{ id: 0, x: e.clientX, y: e.clientY}]
   } else {
-    return e.targetTouches
+    const res = []
+    for (const touch of e.targetTouches) {
+      res.push({
+        id: touch.identifier,
+        x: touch.clientX,
+        y: touch.clientY
+      })
+    }
+
+    return res
   }
 }
 
@@ -50,13 +59,14 @@ const handleSpawnBrush = ({
 }: HandleSpawnOpts) => {
   const events = getEvents(e)
 
-  for (const { clientX, clientY } of events) {
+  for (const { id, x, y } of events) {
     const point = getBrushCoords(
-      clientX - canvasNode.offsetLeft,
-      clientY - canvasNode.offsetTop + window.scrollY,
+      x - canvasNode.offsetLeft,
+      y - canvasNode.offsetTop + window.scrollY,
       canvasNode
     )
-    game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+    //game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+    game.mousedown(id, point.x, point.y, selectedBrush, brushSize, infect)
   }
 }
 
@@ -64,14 +74,11 @@ function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const fpsLad = useRef<HTMLElement | null>(null)
   const dust = useRef<Dust | null>(null)
-  const mousedown = useRef<boolean>(false)
   const [selectedBrush, setSelectedBrush] = useState('sand')
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
 
   const handleMousedown = useCallback((e: MouseEvent | TouchEvent) => {
-    mousedown.current = true
-
     const game = dust.current
     const canvasNode = canvas.current
 
@@ -87,19 +94,31 @@ function App() {
   const handleMousemove = useCallback((e: MouseEvent | TouchEvent) => {
     const canvasNode = canvas.current
     const game = dust.current
-    const mouseIsDown = mousedown.current
 
     e.preventDefault()
 
-    if (!canvasNode || !game || !mouseIsDown) {
+    if (!canvasNode || !game) {
       return
     }
 
     handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize })
   }, [selectedBrush, infect, brushSize])
 
-  const handleMouseup = useCallback(() => {
-    mousedown.current = false
+  const handleMouseup = useCallback((e: MouseEvent | TouchEvent) => {
+    const game = dust.current
+    const canvasNode = canvas.current
+
+    if (!game || !canvasNode) {
+      return
+    }
+
+    if (e instanceof MouseEvent) {
+      game.mouseup(0)
+    } else {
+      for (const touch of e.changedTouches) {
+        game.mouseup(touch.identifier)
+      }
+    }
   }, [])
 
   const handleKeydown = useCallback((e: KeyboardEvent) => {

@@ -110,6 +110,14 @@ const MATERIALS: Record<string, Material> = {
   }
 }
 
+type Mouse = {
+  x: number
+  y: number
+  brush: string
+  brushSize: number
+  infect: boolean
+}
+
 interface DustConstructor {
   gl: WebGLRenderingContext,
   fpsNode: HTMLElement | null
@@ -159,6 +167,8 @@ export default class Dust {
   paused = false
 
   fpsNode: HTMLElement | null
+
+  activeMice: Record<number, Mouse> = {}
 
   constructor({ gl, fpsNode }: DustConstructor) {
     this.gl = gl
@@ -265,6 +275,8 @@ export default class Dust {
 
     let rx = Math.floor(Math.random() * 500) % (this.grid.length - 1)
     const xIncrement = 8
+
+    this.handleMice()
 
     for (let x = 1; x < this.grid.length - 1; x++) {
       const yLen = this.grid[x].length - 1
@@ -401,6 +413,12 @@ export default class Dust {
 
     gl.uniform1i(this.textureLocation, 0)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
+  }
+
+  private handleMice(): void {
+    for (const [_, mouse] of Object.entries(this.activeMice)) {
+      this.spawnCircle(mouse.x, mouse.y, mouse.brush, mouse.brushSize, mouse.infect)
+    }
   }
 
   private updateSprings(cellValue: number, x: number, y: number): void {
@@ -819,6 +837,21 @@ export default class Dust {
     const flippedX = WIDTH - x
     const explosion = new Explosion(flippedX, y, f, r)
     this.explosions.push(explosion)
+  }
+
+  mousedown = (
+    id: number,
+    x: number,
+    y: number,
+    selectedBrush: string,
+    brushSize: number,
+    infect: boolean
+  ) => {
+    this.activeMice[id] = { x, y, brush: selectedBrush, brushSize, infect }
+  }
+
+  mouseup = (id: number) => {
+    delete this.activeMice[id]
   }
 
   spawnCircle = (x: number, y: number, type: string | number, brushSize: number, infect: boolean = false) => {
