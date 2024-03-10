@@ -73,6 +73,7 @@ function App() {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const fpsLad = useRef<HTMLElement | null>(null)
   const dust = useRef<Dust | null>(null)
+  const mousedown = useRef<boolean>(false)
   const [selectedBrush, setSelectedBrush] = useState<BrushType>('sand')
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
@@ -87,16 +88,19 @@ function App() {
       return
     }
 
+    mousedown.current = true
+
     handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize })
   }, [selectedBrush, infect, brushSize])
 
   const handleMousemove = useCallback((e: MouseEvent | TouchEvent) => {
     const canvasNode = canvas.current
     const game = dust.current
+    const mouseIsDown = mousedown.current
 
     e.preventDefault()
 
-    if (!canvasNode || !game) {
+    if (!canvasNode || !game || !mouseIsDown) {
       return
     }
 
@@ -113,6 +117,7 @@ function App() {
 
     if (e instanceof MouseEvent) {
       game.removeBrush(0)
+      mousedown.current = false
     } else {
       for (const touch of e.changedTouches) {
         game.removeBrush(touch.identifier)
