@@ -1,8 +1,8 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import classNames from 'classnames'
-import Dust from './Dust'
-import Point from './Point'
-import * as glUtil from './gl-util'
+import Dust from './dust/Dust'
+import Point from './dust/Point'
+import * as glUtil from './dust/gl-util'
 import MaterialSelector from './MaterialSelector'
 import BrushSelector from './BrushSelector'
 import styles from './styles/App.module.css'
@@ -23,11 +23,11 @@ function getBrushCoords(
   return point
 }
 
-const getEventCoords = (e: MouseEvent | TouchEvent) => {
+function getEvents(e: MouseEvent | TouchEvent): MouseEvent[] | TouchList {
   if (e instanceof MouseEvent) {
-    return e
+    return [e]
   } else {
-    return e.targetTouches[0]
+    return e.targetTouches
   }
 }
 
@@ -48,13 +48,16 @@ const handleSpawnBrush = ({
   brushSize,
   infect
 }: HandleSpawnOpts) => {
-  const { clientX, clientY } = getEventCoords(e)
-  const point = getBrushCoords(
-    clientX - canvasNode.offsetLeft,
-    clientY - canvasNode.offsetTop + window.scrollY,
-    canvasNode
-  )
-  game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+  const events = getEvents(e)
+
+  for (const { clientX, clientY } of events) {
+    const point = getBrushCoords(
+      clientX - canvasNode.offsetLeft,
+      clientY - canvasNode.offsetTop + window.scrollY,
+      canvasNode
+    )
+    game.spawnCircle(point.x, point.y, selectedBrush, brushSize, infect)
+  }
 }
 
 function App() {
