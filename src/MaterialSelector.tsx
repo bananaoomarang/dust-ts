@@ -1,4 +1,4 @@
-import { AriaRole, MouseEventHandler, useRef } from 'react'
+import { AriaRole, Dispatch, MouseEventHandler, SetStateAction, useRef } from 'react'
 import classNames from 'classnames'
 import { BrushModifier, BrushType } from './dust/Dust'
 import styles from './styles/MaterialSelector.module.css'
@@ -81,9 +81,9 @@ interface RowProps {
 
 interface MaterialSelectorProps {
   selected: BrushType
-  setSelected: Function
+  setSelected: Dispatch<SetStateAction<BrushType>>
   infect: boolean
-  setInfect: Function
+  setInfect: Dispatch<SetStateAction<boolean>>
 }
 
 const Row = ({ type, selected, onClick, role }: RowProps) => {
@@ -127,7 +127,7 @@ function BrushSelector ({ selected, setSelected, infect, setInfect }: MaterialSe
             emoji: '🦠'
           }}
           selected={infect}
-          onClick={_ => {
+          onClick={() => {
             document.activeElement && (document.activeElement as HTMLButtonElement).blur()
             setInfect(!infect)
           }}

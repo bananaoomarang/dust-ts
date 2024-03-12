@@ -173,26 +173,28 @@ function GameApp() {
   }, [])
 
   useEffect(() => {
+    const canvasNode = canvas.current
+
     //
     // In theory impossible?
     //
-    if (!canvas.current) {
+    if (!canvasNode) {
       return
     }
 
-    canvas.current.addEventListener('mousedown', handleMousedown)
-    canvas.current.addEventListener('touchstart', handleMousedown)
-    canvas.current.addEventListener('mousemove', handleMousemove)
-    canvas.current.addEventListener('touchmove', handleMousemove)
+    canvasNode.addEventListener('mousedown', handleMousedown)
+    canvasNode.addEventListener('touchstart', handleMousedown)
+    canvasNode.addEventListener('mousemove', handleMousemove)
+    canvasNode.addEventListener('touchmove', handleMousemove)
     window.addEventListener('mouseup', handleMouseup)
     window.addEventListener('touchend', handleMouseup)
     window.addEventListener('keydown', handleKeydown)
 
     return () => {
-      canvas.current?.removeEventListener('mousedown', handleMousedown)
-      canvas.current?.removeEventListener('touchstart', handleMousedown)
-      canvas.current?.removeEventListener('mousemove', handleMousemove)
-      canvas.current?.removeEventListener('touchmove', handleMousemove)
+      canvasNode.removeEventListener('mousedown', handleMousedown)
+      canvasNode.removeEventListener('touchstart', handleMousedown)
+      canvasNode.removeEventListener('mousemove', handleMousemove)
+      canvasNode.removeEventListener('touchmove', handleMousemove)
       window.removeEventListener('mouseup', handleMouseup)
       window.removeEventListener('touchend', handleMouseup)
       window.removeEventListener('keydown', handleKeydown)

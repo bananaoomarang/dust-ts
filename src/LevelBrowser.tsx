@@ -1,6 +1,7 @@
 import { useEffect, useState, MutableRefObject } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Dust, { Level } from './dust/Dust'
+import styles from './styles/LevelBrowser.module.css'
 
 interface Props {
   game: MutableRefObject<Dust | null>
@@ -24,11 +25,26 @@ export default function LevelBrowser ({ game }: Props) {
     }
 
     game.current.loadLevel(level)
-  }, [level])
+  }, [level, game])
 
   return (
-    <div>
-      {levels.map(row => <div key={row.id} onClick={() => setSelectedLevel(row.id)}>{row.name}</div>)}
+    <div className={styles.rows}>
+      {levels.map(row => (
+        <button
+          key={row.id}
+          onClick={e => {
+            (e.target as HTMLButtonElement).blur()
+
+            if (selectedLevel === row.id && level && game.current) {
+              game.current.loadLevel(level)
+            } else {
+              setSelectedLevel(row.id)
+            }
+          }}
+        >
+          {row.name}
+        </button>
+      ))}
     </div>
   )
 }
