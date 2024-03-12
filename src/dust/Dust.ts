@@ -23,6 +23,17 @@ const SPRING = (SOLID | WATER)
 const VOLCANIC = (SOLID | LAVA)
 const OIL_WELL = (SOLID | OIL)
 
+export type Level = {
+  id: number
+  name: string
+  data: string
+}
+
+export type LevelReq = {
+  name: string
+  data: string
+}
+
 type Material = {
   color: number[]
   density?: number
@@ -236,6 +247,12 @@ export default class Dust {
     }
 
     window.requestAnimationFrame(this.run)
+  }
+
+  loadLevel = (level: Level) => {
+    this.paused = true
+    const data = JSON.parse(level.data)
+    this.grid = data
   }
 
 

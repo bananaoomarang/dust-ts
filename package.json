@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.26.3",
     "classnames": "^2.5.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "wretch": "^2.8.1"
   },
   "devDependencies": {
     "@csstools/postcss-global-data": "^2.1.1",
