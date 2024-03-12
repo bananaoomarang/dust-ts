@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from './api'
+import Button from './Button'
 import Dust, { LevelReq } from './dust/Dust'
 import { MutableRefObject } from 'react'
 import styles from './styles/LevelSaver.module.css'
@@ -33,12 +34,11 @@ export default function LevelSaver ({ game }: Props) {
       mutation.mutate({name, data: JSON.stringify(game.current.grid)})
     }}>
       <label>
-        Level name
-        <input value={name} onChange={e => setName(
-          e.target.value)} />
+        <span className={styles.label}>Level Name</span>
+        <input className={styles.input} value={name} onChange={e => setName(e.target.value)} />
       </label>
 
-      <button type="submit">Save Level</button>
+      <Button className={styles.button} type="submit">Save Level</Button>
     </form>
   )
 }

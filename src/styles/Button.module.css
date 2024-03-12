@@ -1,0 +1,22 @@
+.button {
+  font-weight: bold;
+  padding: 1rem;
+  cursor: pointer;
+  transition: background-color 100ms ease-in-out;
+  outline: none;
+  border: none;
+  border-radius: 0;
+
+  @media (--break-large) {
+    padding: 0.25rem 1rem;
+  }
+}
+
+.button:hover,
+.button:focus-visible {
+  background-color: #545454;
+}
+
+.button:active {
+  background-color: #3688c7 !important;
+}

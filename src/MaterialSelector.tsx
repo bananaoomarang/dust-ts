@@ -1,15 +1,22 @@
-import { AriaRole, Dispatch, MouseEventHandler, SetStateAction, useRef } from 'react'
+import { AriaRole, Dispatch, MouseEventHandler, SetStateAction } from 'react'
 import classNames from 'classnames'
 import { BrushModifier, BrushType } from './dust/Dust'
+import Button from './Button'
 import styles from './styles/MaterialSelector.module.css'
 
-type BrushSelectorType = {
+type BaseMaterialSelector = {
   label: string
-  value: BrushType | BrushModifier
+  value: BrushType
   emoji: string
 }
 
-const TYPES: BrushSelectorType[] = [
+type ModifierSelector = {
+  label: string
+  value: BrushModifier
+  emoji: string
+}
+
+const TYPES: BaseMaterialSelector[] = [
   {
     label: 'Sand',
     value: 'sand',
@@ -73,7 +80,7 @@ const TYPES: BrushSelectorType[] = [
 ]
 
 interface RowProps {
-  type: BrushSelectorType
+  type: BaseMaterialSelector | ModifierSelector
   selected: boolean
   onClick: MouseEventHandler<HTMLButtonElement>
   role: AriaRole
@@ -87,24 +94,21 @@ interface MaterialSelectorProps {
 }
 
 const Row = ({ type, selected, onClick, role }: RowProps) => {
-  const ref = useRef(null)
-
   return (
-    <button
-      ref={ref}
+    <Button
       className={classNames(styles.button, { [styles.selected]: selected })}
       onClick={onClick}
       role={role}
     >
       <span className={styles.labelText}>{type.label}</span>
       {type.emoji && <span className={styles.emoji}>{type.emoji}</span>}
-    </button>
+    </Button>
   )
 }
 
 Row.defaultProps = { role: "button" }
 
-function BrushSelector ({ selected, setSelected, infect, setInfect }: MaterialSelectorProps) {
+function MaterialSelector ({ selected, setSelected, infect, setInfect }: MaterialSelectorProps) {
   return (
     <div className={styles.wrapper}>
       <div className={styles.types}>
@@ -138,4 +142,4 @@ function BrushSelector ({ selected, setSelected, infect, setInfect }: MaterialSe
   )
 }
 
-export default BrushSelector
+export default MaterialSelector

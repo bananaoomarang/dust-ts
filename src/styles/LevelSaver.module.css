@@ -1,5 +1,18 @@
 .wrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
+  border-top: 1px solid white;
+  padding-top: 1rem;
+  gap: 1rem;
+  text-align: center;
+}
+
+.label {
+  font-weight: bold;
+}
+
+.input {
+  margin-left: 1rem;
 }

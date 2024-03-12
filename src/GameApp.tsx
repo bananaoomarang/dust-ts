@@ -140,7 +140,6 @@ function GameApp() {
     }
 
     if (document.activeElement && !document.activeElement.contains(canvasNode)) {
-      console.log(document.activeElement)
       return
     }
 

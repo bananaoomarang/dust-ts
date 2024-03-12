@@ -39,28 +39,13 @@
 .button {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  font-weight: bold;
-  padding: 1rem;
-  cursor: pointer;
-  transition: background-color 200ms ease-in-out;
-  outline: none;
-  border: none;
-  border-radius: 0;
   text-align: left;
-
-  @media (--break-large) {
-    padding: 0.25rem 1rem;
-  }
-}
-
-.button:hover,
-.button:focus {
-  background-color: #545454;
+  align-items: center;
 }
 
 .selected,
 .selected:hover,
-.selected:focus {
+.selected:focus-visible {
   background-color: #3688c7;
 }
 
