@@ -5,9 +5,9 @@ import Point from './dust/Point'
 import * as glUtil from './dust/gl-util'
 import MaterialSelector from './MaterialSelector'
 import BrushSelector from './BrushSelector'
-import styles from './styles/App.module.css'
 import LevelBrowser from './LevelBrowser'
 import LevelSaver from './LevelSaver'
+import styles from './styles/GameApp.module.css'
 
 function getBrushCoords(
   x: number,
@@ -62,9 +62,10 @@ const handleSpawnBrush = ({
   const events = getEvents(e)
 
   for (const { id, x, y } of events) {
+    const rect = canvasNode.getBoundingClientRect()
     const point = getBrushCoords(
-      x - canvasNode.offsetLeft,
-      y - canvasNode.offsetTop + window.scrollY,
+      x - rect.left,
+      y - rect.top + window.scrollY,
       canvasNode
     )
     game.addBrush(id, { x: point.x, y: point.y, type: selectedBrush, size: brushSize, infect })
@@ -79,6 +80,7 @@ function GameApp() {
   const [selectedBrush, setSelectedBrush] = useState<BrushType>('sand')
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
+  const [paused, setPaused] = useState(false)
 
   const handleMousedown = useCallback((e: MouseEvent | TouchEvent) => {
     const game = dust.current
@@ -145,6 +147,7 @@ function GameApp() {
 
     if (e.key === ' ') {
       game.paused = !game.paused
+      setPaused(game.paused)
     }
 
     if (e.key === 'r') {
@@ -205,7 +208,10 @@ function GameApp() {
       <h1 className={styles.header}>Dust</h1>
       <div className={styles.wrapper}>
         <span className={classNames(styles.fps, { [styles.show]: true })} ref={fpsLad}>0fps</span>
-        <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
+        <div className={styles.canvasWrapper}>
+          <span className={classNames(styles.paused, { [styles.show]: paused })}>PAUSED</span>
+          <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
+        </div>
         <MaterialSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
         <BrushSelector brushSize={brushSize} setBrushSize={setBrushSize} />
       </div>

@@ -250,7 +250,6 @@ export default class Dust {
   }
 
   loadLevel = (level: Level) => {
-    this.paused = true
     const data = JSON.parse(level.data)
     this.grid = data
   }
