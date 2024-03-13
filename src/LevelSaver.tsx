@@ -32,7 +32,6 @@ export default function LevelSaver ({ game }: Props) {
       }
 
       const data = await game.current.exportGrid()
-      console.log(data)
       mutation.mutate({name, data})
     }}>
       <label>
