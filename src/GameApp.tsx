@@ -65,7 +65,7 @@ const handleSpawnBrush = ({
     const rect = canvasNode.getBoundingClientRect()
     const point = getBrushCoords(
       x - rect.left,
-      y - rect.top + window.scrollY,
+      y - rect.top,
       canvasNode
     )
     game.addBrush(id, { x: point.x, y: point.y, type: selectedBrush, size: brushSize, infect })
@@ -137,6 +137,8 @@ function GameApp() {
     const canvasNode = canvas.current
     const game = dust.current
 
+    let handled = false
+
     if (!game || !canvasNode) {
       return
     }
@@ -148,10 +150,16 @@ function GameApp() {
     if (e.key === ' ') {
       game.paused = !game.paused
       setPaused(game.paused)
+      handled = true
     }
 
     if (e.key === 'r') {
       game.clearLevel()
+      handled = true
+    }
+
+    if (handled) {
+      e.preventDefault()
     }
   }, [])
 
@@ -216,7 +224,10 @@ function GameApp() {
         <BrushSelector brushSize={brushSize} setBrushSize={setBrushSize} />
       </div>
       <LevelSaver game={dust} />
-      <LevelBrowser game={dust} />
+      <LevelBrowser
+        game={dust}
+        thumbnailSize={150}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import * as glUtil from './gl-util'
 import vertShader from './shaders/vert.glsl?raw'
 import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
+import { compressLevel, decompressLevel } from './level-utils'
 
 const WIDTH = 500
 const HEIGHT = 500
@@ -55,7 +56,7 @@ type Brush  = {
 }
 
 function _setPixel(
-  data: Uint8Array,
+  data: Uint8ClampedArray,
   offset: number,
   r: number,
   g: number,
@@ -168,7 +169,7 @@ export default class Dust {
   texture: WebGLTexture | null
   textureLocation: WebGLUniformLocation | null
   texcoordLocation: WebGLUniformLocation | null
-  textureData = new Uint8Array(500 * 500 * 4)
+  textureData = new Uint8ClampedArray(500 * 500 * 4)
 
   grid = _create2dArray(WIDTH, HEIGHT)
   blacklist = _create2dArray(WIDTH, HEIGHT)
@@ -248,12 +249,6 @@ export default class Dust {
 
     window.requestAnimationFrame(this.run)
   }
-
-  loadLevel = (level: Level) => {
-    const data = JSON.parse(level.data)
-    this.grid = data
-  }
-
 
   private move(x1: number, y1: number, x2: number, y2: number): void {
     if (
@@ -382,33 +377,7 @@ export default class Dust {
   private draw() {
     const { gl } = this
 
-    let color
-    let offset = 0
-
-    for (let x = 0; x < this.grid.length; x++) {
-      for (let y = 0; y < this.grid[x].length; y++) {
-        const s = this.grid[x][y]
-
-        if (s === 0) {
-          _setPixel(this.textureData, offset, 0, 0, 0, 0)
-          offset += 4
-          continue 
-        }
-
-        const material = this.getMaterial(s)
-
-        if (s & BURNING && material.burnColors) {
-          color = (Math.random() > 0.1)
-            ? [material.burnColors[0], material.burnColors[1], material.burnColors[2]]
-            : [material.burnColors[3], material.burnColors[4], material.burnColors[5]]
-        } else {
-          color = material.color
-        }
-
-        _setPixel(this.textureData, offset, color[0], color[1], color[2], 255)
-        offset += 4
-      }
-    }
+    this.fillTextureData(this.grid, this.textureData)
 
     gl.clear(gl.COLOR_BUFFER_BIT)
 
@@ -907,6 +876,46 @@ export default class Dust {
 
   clearLevel = (): void => {
     this.grid = _create2dArray(WIDTH, HEIGHT)
+  }
+
+  exportGrid = async (): Promise<string> => {
+    const data = await compressLevel(this.grid)
+    return data
+  }
+
+  loadLevel = async (level: Level): Promise<void> => {
+    const grid = await decompressLevel(level.data)
+    this.grid = grid
+  }
+
+  fillTextureData = (grid: number[][], textureData: Uint8ClampedArray) => {
+    let color
+    let offset = 0
+
+    for (let x = 0; x < grid.length; x++) {
+      for (let y = 0; y < grid[x].length; y++) {
+        const s = grid[x][y]
+
+        if (s === 0) {
+          _setPixel(textureData, offset, 0, 0, 0, 0)
+          offset += 4
+          continue 
+        }
+
+        const material = this.getMaterial(s)
+
+        if (s & BURNING && material.burnColors) {
+          color = (Math.random() > 0.1)
+            ? [material.burnColors[0], material.burnColors[1], material.burnColors[2]]
+            : [material.burnColors[3], material.burnColors[4], material.burnColors[5]]
+        } else {
+          color = material.color
+        }
+
+        _setPixel(textureData, offset, color[0], color[1], color[2], 255)
+        offset += 4
+      }
+    }
   }
 
   private getType(typeString: BrushType): number {

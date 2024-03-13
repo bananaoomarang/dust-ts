@@ -5,12 +5,23 @@
 }
 
 .rows {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 1rem;
+  justify-items: center;
+  padding-bottom: 1rem;
+
+  @media (--break-large) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.canvas {
+  max-width: 100%;
 }
 
 .button {
+  display: flex;
+  flex-direction: column;
   width: 16rem;
 }

@@ -25,13 +25,15 @@ export default function LevelSaver ({ game }: Props) {
   if (mutation.error) return 'Failed to save...'
 
   return (
-    <form className={styles.wrapper} onSubmit={e => {
+    <form className={styles.wrapper} onSubmit={async e => {
       e.preventDefault()
       if (!game.current) {
         return
       }
 
-      mutation.mutate({name, data: JSON.stringify(game.current.grid)})
+      const data = await game.current.exportGrid()
+      console.log(data)
+      mutation.mutate({name, data})
     }}>
       <label>
         <span className={styles.label}>Level Name</span>
