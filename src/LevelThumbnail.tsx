@@ -75,8 +75,10 @@ export default function LevelThumbnail ({
   return (
     <Button
       className={styles.button}
-      onClick={e => {
-        (e.target as HTMLButtonElement).blur()
+      onClick={_ => {
+        if (document.activeElement) {
+          (document.activeElement as HTMLElement).blur()
+        }
 
         if (selectedLevel?.id === level.id && game.current) {
           game.current.loadLevel(selectedLevel)

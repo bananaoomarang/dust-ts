@@ -14,25 +14,33 @@ interface Props {
   pageSize: number
 }
 
+type LevelsResults = {
+  results: Level[]
+  hasMore: boolean
+}
+
 export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) {
   const decompressedLevels = useRef<Record<number, number[][]>>({})
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null)
   const [offset, setOffset] = useState<number>(0)
 
-  const { data: levels, isFetching } = useQuery<Level[]>({
+  const { data: results, isFetching } = useQuery<LevelsResults>({
     queryKey: ['/levels', pageSize, offset],
     queryFn: async ({ queryKey: [url, limit, offset] }) => {
       const res = await api
         .query({ limit, offset })
         .get(url as string)
         .res()
-      const data: Level[] = await res.json()
-      for (const level of data) {
+      const data: LevelsResults = await res.json()
+      for (const level of data.results) {
         decompressedLevels.current[level.id] = await decompressLevel(level.data)
       }
       return data
     },
-    initialData: []
+    initialData: {
+      results: [],
+      hasMore: false
+    }
   })
 
   useEffect(() => {
@@ -56,7 +64,7 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
     <div className={styles.wrapper}>
       <h2>User Levels</h2>
       <div className={styles.rows}>
-        {levels.map(level => (
+        {results.results.map(level => (
           <LevelThumbnail
             key={level.id}
             thumbnailSize={thumbnailSize}
@@ -70,7 +78,7 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
       </div>
 
       {offset > 0 && <Button onClick={() => setOffset(offset - pageSize)}>Previous page</Button>}
-      {levels.length === pageSize && <Button onClick={() => setOffset(offset + pageSize)}>Next page</Button>}
+      {results.hasMore && <Button onClick={() => setOffset(offset + pageSize)}>Next page</Button>}
     </div>
   )
 }
