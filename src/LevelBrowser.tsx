@@ -14,7 +14,7 @@ interface Props {
 export default function LevelBrowser ({ game, thumbnailSize }: Props) {
   const canvases = useRef<Record<number, HTMLCanvasElement | null>>({})
   const decompressedLevels = useRef<Record<number, number[][]>>({})
-  const [selectedLevel, setSelectedLevel] = useState<number | null>(null)
+  const [selectedLevel, setSelectedLevel] = useState<Level | null>(null)
   const { data: levels } = useQuery<Level[]>({
     queryKey: ['/levels'],
     queryFn: async ({ queryKey: [url] }) => {
@@ -28,18 +28,13 @@ export default function LevelBrowser ({ game, thumbnailSize }: Props) {
     initialData: []
   })
 
-  const { data: level } = useQuery<Level>({
-    queryKey: [`/levels/${selectedLevel}`],
-    enabled: !!selectedLevel
-  })
-
   useEffect(() => {
-    if (!game.current || !level) {
+    if (!game.current || !selectedLevel) {
       return
     }
 
-    game.current.loadLevel(level)
-  }, [level, game])
+    game.current.loadLevel(selectedLevel)
+  }, [selectedLevel, game])
 
   useEffect(() => {
     const dust = game.current
@@ -101,7 +96,7 @@ export default function LevelBrowser ({ game, thumbnailSize }: Props) {
 
   return (
     <div className={styles.wrapper}>
-      <h2>Saved Levels</h2>
+      <h2>User Levels</h2>
       <div className={styles.rows}>
         {levels.map(row => (
           <Button
@@ -110,10 +105,10 @@ export default function LevelBrowser ({ game, thumbnailSize }: Props) {
             onClick={e => {
               (e.target as HTMLButtonElement).blur()
 
-              if (selectedLevel === row.id && level && game.current) {
-                game.current.loadLevel(level)
+              if (selectedLevel?.id === row.id && game.current) {
+                game.current.loadLevel(selectedLevel)
               } else {
-                setSelectedLevel(row.id)
+                setSelectedLevel(row)
               }
             }}
           >
