@@ -17,7 +17,7 @@ export default function LevelSaver ({ game }: Props) {
   const mutation = useMutation({
     mutationFn: (newLevel: LevelReq) => api.url("/levels").post(newLevel).res(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/levels'], exact: true })
+      queryClient.invalidateQueries({ queryKey: ['/levels'] })
     }
   })
 

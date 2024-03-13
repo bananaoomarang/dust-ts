@@ -11,18 +11,10 @@
   gap: 1rem;
   justify-items: center;
   padding-bottom: 1rem;
+  max-width: 80rem;
+  margin: 0 auto;
 
   @media (--break-large) {
     grid-template-columns: repeat(3, 1fr);
   }
-}
-
-.canvas {
-  max-width: 100%;
-}
-
-.button {
-  display: flex;
-  flex-direction: column;
-  width: 16rem;
 }

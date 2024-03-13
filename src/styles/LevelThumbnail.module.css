@@ -1,0 +1,9 @@
+.canvas {
+  max-width: 100%;
+}
+
+.button {
+  display: flex;
+  flex-direction: column;
+  width: 16rem;
+}
