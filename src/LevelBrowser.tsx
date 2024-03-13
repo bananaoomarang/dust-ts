@@ -5,6 +5,7 @@ import Dust, { Level } from './dust/Dust'
 import Button from './Button'
 import styles from './styles/LevelBrowser.module.css'
 import { decompressLevel } from './dust/level-utils'
+import Loading from './Loading'
 
 interface Props {
   game: MutableRefObject<Dust | null>,
@@ -15,10 +16,15 @@ export default function LevelBrowser ({ game, thumbnailSize }: Props) {
   const canvases = useRef<Record<number, HTMLCanvasElement | null>>({})
   const decompressedLevels = useRef<Record<number, number[][]>>({})
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null)
-  const { data: levels } = useQuery<Level[]>({
-    queryKey: ['/levels'],
-    queryFn: async ({ queryKey: [url] }) => {
-      const res = await api.get(url as string).res()
+  const [offset, setOffset] = useState<number>(0)
+
+  const { data: levels, isFetching } = useQuery<Level[]>({
+    queryKey: ['/levels', offset],
+    queryFn: async ({ queryKey: [url, offset] }) => {
+      const res = await api
+        .query({ offset})
+        .get(url as string)
+        .res()
       const data: Level[] = await res.json()
       for (const level of data) {
         decompressedLevels.current[level.id] = await decompressLevel(level.data)
@@ -94,6 +100,15 @@ export default function LevelBrowser ({ game, thumbnailSize }: Props) {
     }
   }, [levels, game, thumbnailSize])
 
+  if (isFetching) {
+    return (
+      <div className={styles.wrapper}>
+        <h2>User Levels</h2>
+        <Loading />
+      </div>
+    )
+  }
+
   return (
     <div className={styles.wrapper}>
       <h2>User Levels</h2>
@@ -122,6 +137,8 @@ export default function LevelBrowser ({ game, thumbnailSize }: Props) {
           </Button>
         ))}
       </div>
+
+      <Button onClick={() => setOffset(offset + 1)}>Next page</Button>
     </div>
   )
 }
