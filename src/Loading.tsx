@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 
-export default function Loading () {
+interface Props {
+  className?: string
+}
+
+export default function Loading ({ className }: Props) {
   const [dots, setDots] = useState('')
   useEffect(() => {
     const timeout = setInterval(() => {
@@ -10,6 +14,6 @@ export default function Loading () {
     return () => clearInterval(timeout)
   }, [])
   return (
-    <h3>Loading{dots}</h3>
+    <h3 className={className || ''}>Loading{dots}</h3>
   )
 }

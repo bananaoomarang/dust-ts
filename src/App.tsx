@@ -1,26 +1,22 @@
-import { QueryClient, QueryClientProvider, QueryKey } from '@tanstack/react-query'
+import { SWRConfig } from 'swr'
 import api from  './api'
 import GameApp from './GameApp'
 
-const defaultQueryFn = async ({ queryKey: [url] }: { queryKey: QueryKey }) => {
-  const res = await api.get(url as string).res()
+async function defaultFetcher (path: string) {
+  const res = await api.get(path).res()
   const data = await res.json()
   return data
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      queryFn: defaultQueryFn
-    }
-  }
-})
+const swrConfig = {
+  fetcher: defaultFetcher
+}
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <SWRConfig value={swrConfig}>
       <GameApp />
-    </QueryClientProvider>
+    </SWRConfig>
   )
 }
 

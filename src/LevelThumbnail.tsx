@@ -85,6 +85,7 @@ export default function LevelThumbnail ({
         } else {
           setSelectedLevel(level)
         }
+        window.scrollTo(0, 0)
       }}
     >
       <canvas
@@ -93,7 +94,7 @@ export default function LevelThumbnail ({
         width={thumbnailSize}
         height={thumbnailSize}
       />
-      {level.name}
+      <span className={styles.name}>{level.name}</span>
     </Button>
   )
 }

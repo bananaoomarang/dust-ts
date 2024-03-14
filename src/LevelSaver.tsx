@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSWRConfig } from 'swr'
+import useSWRMutation from 'swr/mutation'
 import api from './api'
 import Button from './Button'
 import Dust, { LevelReq } from './dust/Dust'
@@ -10,19 +11,23 @@ interface Props {
   game: MutableRefObject<Dust | null>
 }
 
+function saveLevel (path: string, { arg: newLevel }: { arg: LevelReq }) {
+  return api
+    .url(path)
+    .post(newLevel)
+    .res()
+}
+
 export default function LevelSaver ({ game }: Props) {
-  const queryClient = useQueryClient()
   const [name, setName] = useState('')
 
-  const mutation = useMutation({
-    mutationFn: (newLevel: LevelReq) => api.url("/levels").post(newLevel).res(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/levels'] })
-    }
+  const { mutate } = useSWRConfig()
+  const { trigger, error, isMutating } = useSWRMutation('/levels', saveLevel, {
+    onSuccess: () => mutate(key => Array.isArray(key) && key[0] === '/levels')
   })
 
-  if (mutation.isPending) return 'Saving...'
-  if (mutation.error) return 'Failed to save...'
+  if (isMutating) return 'Saving...'
+  if (error) return 'Failed to save...'
 
   return (
     <form className={styles.wrapper} onSubmit={async e => {
@@ -32,7 +37,7 @@ export default function LevelSaver ({ game }: Props) {
       }
 
       const data = await game.current.exportGrid()
-      mutation.mutate({name, data})
+      trigger({ name, data })
     }}>
       <label>
         <span className={styles.label}>Level Name</span>

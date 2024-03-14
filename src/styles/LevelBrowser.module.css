@@ -10,11 +10,50 @@
   grid-template-columns: 1fr;
   gap: 1rem;
   justify-items: center;
-  padding-bottom: 1rem;
+  padding: 1rem 0;
   max-width: 80rem;
   margin: 0 auto;
+  opacity: 0;
+  transition: opacity 200ms ease-in-out;
 
   @media (--break-large) {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+.gridLayout {
+  position: relative;
+  min-height: 53.6875rem;
+  box-sizing: border-box;
+}
+
+.loading {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, 0);
+  opacity: 0;
+  transition: opacity 200ms ease-in-out;
+}
+
+.paginator {
+  border-top: 1px solid white;
+  padding-top: 1rem;
+}
+
+.pageNumber {
+  font-weight: bold;
+}
+
+.pageTurners {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1rem;
+  opacity: 0;
+  transition: opacity 200ms ease-in-out;
+}
+
+.show {
+  opacity: 1;
 }
