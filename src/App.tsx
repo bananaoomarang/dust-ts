@@ -1,5 +1,6 @@
 import { Route, Switch } from 'wouter'
 import { SWRConfig } from 'swr'
+import { getPath } from './route-utils'
 import api from  './api'
 import GameApp from './GameApp'
 
@@ -13,13 +14,6 @@ const swrConfig = {
   fetcher: defaultFetcher
 }
 
-//
-// TODO: wouter basepath option not playing nicely with gh pages
-//
-function getPath (path: string): string {
-  const base = import.meta.env.PROD ? '/dust-ts' : ''
-  return base + path
-}
 
 function App() {
   return (
