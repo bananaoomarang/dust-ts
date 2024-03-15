@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, MutableRefObject } from 'react'
 import { useSWRConfig } from 'swr'
 import useSWRMutation from 'swr/mutation'
 import api from './api'
 import Button from './Button'
+import Input from './Input'
 import Dust, { LevelReq } from './dust/Dust'
-import { MutableRefObject } from 'react'
 import styles from './styles/LevelSaver.module.css'
 
 interface Props {
@@ -41,10 +41,16 @@ export default function LevelSaver ({ game }: Props) {
     }}>
       <label>
         <span className={styles.label}>Level Name</span>
-        <input className={styles.input} value={name} onChange={e => setName(e.target.value)} />
+        <Input
+          className={styles.input}
+          type="text"
+          placeholder="Name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
       </label>
 
-      <Button className={styles.button} type="submit">Save Level</Button>
+      <Button className={styles.button} type="submit" disabled={!name}>Save Level</Button>
     </form>
   )
 }

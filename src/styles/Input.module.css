@@ -1,0 +1,16 @@
+.input {
+  background-color: transparent;
+  border: 2px solid white;
+  box-sizing: border-box;
+  padding: 0.25rem;
+
+  &::placeholder {
+    color: white;
+    opacity: 0.6;
+    font-weight: bold;
+  }
+}
+
+.input[type=text] {
+  outline: none;
+}

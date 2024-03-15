@@ -46,7 +46,7 @@
 .selected,
 .selected:hover,
 .selected:focus-visible {
-  background-color: #3688c7;
+  background-color: var(--blue);
 }
 
 .emoji {

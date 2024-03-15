@@ -71,7 +71,11 @@ export default function LevelThumbnail ({
   }, [level, levelData, game, thumbnailSize])
 
   return (
-    <Link className={classNames(buttonStyles.button, styles.link)} href={`/levels/${level.id}`}>
+    <Link
+      className={classNames(buttonStyles.button, styles.link)}
+      href={`/levels/${level.id}`}
+      onClick={() => window.scroll(0, 0)}
+    >
       <canvas
         className={styles.canvas}
         ref={canvas}

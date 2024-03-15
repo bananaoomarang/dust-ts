@@ -2,7 +2,7 @@
   font-weight: bold;
   padding: 1rem;
   cursor: pointer;
-  transition: background-color 100ms ease-in-out;
+  transition: all 100ms ease-in-out;
   outline: none;
   border: none;
   border-radius: 0;
@@ -11,13 +11,19 @@
   @media (--break-large) {
     padding: 0.25rem 1rem;
   }
-}
 
-.button:hover,
-.button:focus-visible {
-  background-color: #545454;
-}
+  &:hover,
+  &:focus-visible {
+    background-color: var(--light-gray);
+  }
 
-.button:active {
-  background-color: #3688c7 !important;
+  &:active {
+    background-color: var(--blue) !important;
+  }
+
+  &[disabled] {
+    cursor: default;
+    background-color: var(--light-gray);
+    opacity: 0.5;
+  }
 }

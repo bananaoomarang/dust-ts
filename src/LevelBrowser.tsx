@@ -8,6 +8,7 @@ import api from  './api'
 import Dust, { Level } from './dust/Dust'
 import Loading from './Loading'
 import LevelThumbnail from './LevelThumbnail'
+import Input from './Input'
 import buttonStyles from './styles/Button.module.css'
 import styles from './styles/LevelBrowser.module.css'
 
@@ -158,7 +159,7 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
     <div className={styles.wrapper}>
       <h2>User Levels</h2>
 
-      <input
+      <Input
         type="text"
         placeholder="Search"
         value={formName}

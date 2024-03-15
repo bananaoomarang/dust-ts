@@ -1,4 +1,5 @@
 import { Dispatch, SetStateAction } from 'react'
+import Input from './Input'
 import styles from './styles/BrushSelector.module.css'
 
 interface BrushSelectorProps {
@@ -11,7 +12,7 @@ export default function BrushSelector({ brushSize, setBrushSize }: BrushSelector
     <div className={styles.wrapper}>
       <label>
         <div>Brush Size: {brushSize}</div>
-        <input type="range" min="1" max="200" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} />
+        <Input type="range" min="1" max="200" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} />
       </label>
     </div>
   )
