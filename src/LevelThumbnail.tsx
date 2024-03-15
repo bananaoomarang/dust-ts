@@ -1,14 +1,14 @@
-import { Dispatch, MutableRefObject, SetStateAction, useEffect, useRef } from 'react'
-import Button from './Button'
+import { MutableRefObject, useEffect, useRef } from 'react'
+import { Link } from 'wouter'
+import classNames from 'classnames'
 import Dust, { Level } from './dust/Dust'
+import buttonStyles from './styles/Button.module.css'
 import styles from './styles/LevelThumbnail.module.css'
 
 interface Props {
   thumbnailSize: number
   level: Level
   levelData: number[][]
-  setSelectedLevel: Dispatch<SetStateAction<Level | null>>
-  selectedLevel: Level | null
   game: MutableRefObject<Dust | null>
 }
 
@@ -16,8 +16,6 @@ export default function LevelThumbnail ({
   thumbnailSize,
   level,
   levelData,
-  setSelectedLevel,
-  selectedLevel,
   game
 }: Props) {
   const canvas = useRef<HTMLCanvasElement | null>(null)
@@ -73,21 +71,7 @@ export default function LevelThumbnail ({
   }, [level, levelData, game, thumbnailSize])
 
   return (
-    <Button
-      className={styles.button}
-      onClick={_ => {
-        if (document.activeElement) {
-          (document.activeElement as HTMLElement).blur()
-        }
-
-        if (selectedLevel?.id === level.id && game.current) {
-          game.current.loadLevel(selectedLevel)
-        } else {
-          setSelectedLevel(level)
-        }
-        window.scrollTo(0, 0)
-      }}
-    >
+    <Link className={classNames(buttonStyles.button, styles.link)} href={`/levels/${level.id}`}>
       <canvas
         className={styles.canvas}
         ref={canvas}
@@ -95,6 +79,6 @@ export default function LevelThumbnail ({
         height={thumbnailSize}
       />
       <span className={styles.name}>{level.name}</span>
-    </Button>
+    </Link>
   )
 }

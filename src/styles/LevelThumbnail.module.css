@@ -2,11 +2,15 @@
   max-width: 100%;
 }
 
-.button {
+.link {
   display: flex;
   flex-direction: column;
   width: 16rem;
   border: 1px solid white;
+
+  &:hover {
+    color: white;
+  }
 }
 
 .name {

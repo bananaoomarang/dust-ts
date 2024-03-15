@@ -1,3 +1,4 @@
+import { Route, Switch } from 'wouter'
 import { SWRConfig } from 'swr'
 import api from  './api'
 import GameApp from './GameApp'
@@ -15,7 +16,16 @@ const swrConfig = {
 function App() {
   return (
     <SWRConfig value={swrConfig}>
-      <GameApp />
+      <Switch>
+        <Route path="/">
+          <GameApp />
+        </Route>
+        <Route path="/levels/:id">
+          {params => <GameApp levelId={params.id} />}
+        </Route>
+
+        <Route>404: No such page!</Route>
+      </Switch>
     </SWRConfig>
   )
 }

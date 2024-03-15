@@ -1,4 +1,4 @@
-import { useEffect, useState, MutableRefObject, useRef, Dispatch, SetStateAction } from 'react'
+import { useState, MutableRefObject, useRef } from 'react'
 import useSWR from 'swr'
 import { useDebounce } from '@uidotdev/usehooks'
 import { decompressLevel } from './dust/level-utils'
@@ -26,9 +26,7 @@ interface TheGridProps {
   results: LevelsResults,
   thumbnailSize: number,
   game: MutableRefObject<Dust | null>,
-  decompressedLevels: MutableRefObject<Record<number, number[][]>>,
-  setSelectedLevel: Dispatch<SetStateAction<Level | null>>,
-  selectedLevel: Level | null
+  decompressedLevels: MutableRefObject<Record<number, number[][]>>
 }
 
 function TheGrid ({
@@ -36,8 +34,6 @@ function TheGrid ({
   results,
   thumbnailSize,
   decompressedLevels,
-  setSelectedLevel,
-  selectedLevel,
   game
 }: TheGridProps) {
   return (
@@ -50,8 +46,6 @@ function TheGrid ({
             thumbnailSize={thumbnailSize}
             level={level}
             levelData={decompressedLevels.current[level.id]}
-            setSelectedLevel={setSelectedLevel}
-            selectedLevel={selectedLevel}
             game={game}
           />
         ))}
@@ -63,7 +57,6 @@ function TheGrid ({
 
 export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) {
   const decompressedLevels = useRef<Record<number, number[][]>>({})
-  const [selectedLevel, setSelectedLevel] = useState<Level | null>(null)
   const [offset, setOffset] = useState<number>(0)
   const [name, setName] = useState('')
   const debouncedName = useDebounce(name, 1000)
@@ -89,14 +82,6 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
     }
   )
 
-  useEffect(() => {
-    if (!game.current || !selectedLevel) {
-      return
-    }
-
-    game.current.loadLevel(selectedLevel)
-  }, [selectedLevel, game])
-
   if (!isLoading && results.results.length === 0) {
     return null
   }
@@ -118,8 +103,6 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
         thumbnailSize={thumbnailSize}
         game={game}
         decompressedLevels={decompressedLevels}
-        setSelectedLevel={setSelectedLevel}
-        selectedLevel={selectedLevel}
       />
 
       <div className={styles.paginator}>

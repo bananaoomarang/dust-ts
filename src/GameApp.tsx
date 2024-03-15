@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
+import useSWR from 'swr'
 import classNames from 'classnames'
 import Dust, { BrushType } from './dust/Dust'
 import Point from './dust/Point'
@@ -72,7 +73,11 @@ const handleSpawnBrush = ({
   }
 }
 
-function GameApp() {
+interface Props {
+  levelId?: string
+}
+
+function GameApp({ levelId }: Props) {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const fpsLad = useRef<HTMLElement | null>(null)
   const dust = useRef<Dust | null>(null)
@@ -81,6 +86,8 @@ function GameApp() {
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
   const [paused, setPaused] = useState(false)
+
+  const levelQuery = useSWR(levelId ? `/levels/${levelId}` : null)
 
   const handleMousedown = useCallback((e: MouseEvent | TouchEvent) => {
     const game = dust.current
@@ -162,6 +169,15 @@ function GameApp() {
       e.preventDefault()
     }
   }, [])
+
+  useEffect(() => {
+    const game = dust.current
+    if (!game || !levelQuery.data) {
+      return
+    }
+
+    game.loadLevel(levelQuery.data)
+  }, [levelQuery.data])
 
   useEffect(() => {
     //
