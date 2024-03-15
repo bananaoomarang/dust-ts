@@ -110,27 +110,16 @@ function getPageLink (page: number, searchString: string): string {
 export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) {
   const decompressedLevels = useRef<Record<number, number[][]>>({})
   const searchString = useSearch()
-  const [page, setPage] = useState<number>(Number(new URLSearchParams(searchString).get('page')) || 1)
-  const [name, setName] = useState(new URLSearchParams(searchString).get('name') || '')
-  const debouncedName = useDebounce(name, 1000)
   const [_, setLocation] = useLocation()
 
-  useEffect(() => {
-    const params = new URLSearchParams(searchString)
-    setPage(Number(params.get('page') || 1))
-  }, [searchString])
+  const [formName, setFormName] = useState(new URLSearchParams(searchString).get('name') || '')
+  const debouncedName = useDebounce(formName, 1000)
+
+  const page = Number(new URLSearchParams(searchString).get('page') || 1)
+  const name = new URLSearchParams(searchString).get('name') || ''
 
   useEffect(() => {
-    const params = new URLSearchParams(searchString)
     const newParams = new URLSearchParams('')
-
-    if (debouncedName === params.get('name')) {
-      return
-    }
-
-    if (debouncedName === '' && params.get('name') === null) {
-      return
-    }
 
     if (debouncedName !== '') {
       newParams.set('name', debouncedName)
@@ -141,11 +130,11 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
       url += '?' + newParams.toString()
     }
 
-    setLocation(url, { replace: true })
-  }, [debouncedName, searchString, setLocation])
+    setLocation(url)
+  }, [debouncedName, setLocation])
 
   const { data: results, isLoading } = useSWR(
-    ['/levels', debouncedName, pageSize, (page - 1) * pageSize],
+    ['/levels', name, pageSize, (page - 1) * pageSize],
     async ([url, name, limit, offset]) => {
       const res = await api
         .query({ name, limit, offset })
@@ -172,9 +161,9 @@ export default function LevelBrowser ({ game, thumbnailSize, pageSize }: Props) 
       <input
         type="text"
         placeholder="Search"
-        value={name}
+        value={formName}
         onChange={e => {
-          setName(e.target.value)
+          setFormName(e.target.value)
         }}
       />
 
