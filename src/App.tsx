@@ -1,4 +1,4 @@
-import { Router, Route, Switch } from 'wouter'
+import { Route, Switch } from 'wouter'
 import { SWRConfig } from 'swr'
 import api from  './api'
 import GameApp from './GameApp'
@@ -13,21 +13,27 @@ const swrConfig = {
   fetcher: defaultFetcher
 }
 
+//
+// TODO: wouter basepath option not playing nicely with gh pages
+//
+function getPath (path: string): string {
+  const base = import.meta.env.PROD ? '/dust-ts' : ''
+  return base + path
+}
+
 function App() {
   return (
     <SWRConfig value={swrConfig}>
-      <Router base={import.meta.env.PROD ? '/dust-ts' : ''}>
-        <Switch>
-          <Route path="/">
-            <GameApp />
-          </Route>
-          <Route path="/levels/:id">
-            {params => <GameApp levelId={params.id} />}
-          </Route>
+      <Switch>
+        <Route path={getPath('/')}>
+          <GameApp />
+        </Route>
+        <Route path={getPath('/levels/:id')}>
+          {(params: { id: string }) => <GameApp levelId={params.id} />}
+        </Route>
 
-          <Route>404: No such page!</Route>
-        </Switch>
-      </Router>
+        <Route>404: No such page!</Route>
+      </Switch>
     </SWRConfig>
   )
 }
