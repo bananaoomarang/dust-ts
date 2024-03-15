@@ -47,13 +47,29 @@
 
 .pageTurners {
   display: flex;
+  padding: 0 1rem;
   gap: 1rem;
   justify-content: center;
+  max-width: 30rem;
+  margin: 0 auto;
   margin-top: 1rem;
   opacity: 0;
   transition: opacity 200ms ease-in-out;
 }
 
+.pageTurners > * {
+  flex-grow: 1;
+  flex-basis: 50%;
+}
+
 .show {
   opacity: 1;
+}
+
+.link {
+  border: 1px solid white;
+
+  &:hover {
+    color: white;
+  }
 }
