@@ -63,6 +63,11 @@ const TYPES: BaseMaterialSelector[] = [
     emoji: '🛢'
   },
   {
+    label: 'Fuse',
+    value: 'fuse',
+    emoji: '💣'
+  },
+  {
     label: 'Life Itself',
     value: 'life',
     emoji: '🛸'

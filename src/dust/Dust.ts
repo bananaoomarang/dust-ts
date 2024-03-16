@@ -20,9 +20,27 @@ const BURNING = 256
 const LIFE = 512
 const INFECTANT = 1024
 const C4 = 2048
+const FUSE = 4096
 const SPRING = (SOLID | WATER)
 const VOLCANIC = (SOLID | LAVA)
 const OIL_WELL = (SOLID | OIL)
+
+const TYPE_MAP: Record<BrushType, number> = {
+  space: 0,
+  sand: SAND,
+  oil: OIL,
+  fire: FIRE,
+  lava: LAVA,
+  water: WATER,
+  steam: STEAM,
+  solid: SOLID,
+  spring: SPRING,
+  volcanic: VOLCANIC,
+  ['oil well']: OIL_WELL,
+  life: LIFE,
+  C4: C4,
+  fuse: FUSE
+}
 
 export type Level = {
   id: number
@@ -43,7 +61,7 @@ type Material = {
   liquid?: boolean
 }
 
-export type BrushType = "sand" | "oil" | "fire" | "lava" | "water" | "steam" | "solid" | "life" | "C4" | "spring" | "volcanic" | "oil well" | "space"
+export type BrushType = "sand" | "oil" | "fire" | "lava" | "water" | "steam" | "solid" | "life" | "C4" | "spring" | "volcanic" | "oil well" | "space" | "fuse"
 
 export type BrushModifier = "burning" | "infectant"
 
@@ -124,6 +142,10 @@ const MATERIALS: Record<string, Material> = {
   life: {
     color: [0, 255, 51],
     burnColors: [255, 179, 26, 179, 153, 26]
+  },
+  fuse: {
+    color: [255, 255, 255],
+    burnColors:  [255, 102, 26, 204, 102, 26 ],
   },
   solid: {
     color: [0, 0, 0]
@@ -347,7 +369,7 @@ export default class Dust {
 
         this.updateFire(d, rx, ry)
 
-        if (d & LIFE || d & C4) {
+        if (d & LIFE || d & C4 || d & FUSE) {
           continue
         }
 
@@ -536,6 +558,7 @@ export default class Dust {
     if (cellValue & FIRE || cellValue & LAVA || cellValue & BURNING) {
       this.infect(x, y, LIFE, BURNING)
       this.infect(x, y, C4, BURNING)
+      this.infect(x, y, FUSE, BURNING)
 
       if (Math.random() > 0.5) {
         this.infect(x, y, OIL, BURNING)
@@ -640,6 +663,7 @@ export default class Dust {
     if (s & LAVA) return MATERIALS.lava
     if (s & LIFE) return MATERIALS.life
     if (s & C4) return MATERIALS.C4
+    if (s & FUSE) return MATERIALS.fuse
     if (s & SOLID) return MATERIALS.solid
 
     return MATERIALS.space
@@ -848,7 +872,7 @@ export default class Dust {
 
     if (this.dustCount >= MAX_GRAINS && type !== 'space') return
 
-    let nType = typeof type === 'string' ? this.getType(type) : type
+    let nType = typeof type === 'string' ? TYPE_MAP[type] || 0 : type
     const segments = 500
     const step = (2 * Math.PI) / segments
 
@@ -915,37 +939,6 @@ export default class Dust {
         _setPixel(textureData, offset, color[0], color[1], color[2], 255)
         offset += 4
       }
-    }
-  }
-
-  private getType(typeString: BrushType): number {
-    switch (typeString) {
-      case 'space':
-        return 0
-      case 'sand':
-        return SAND
-      case 'oil':
-        return OIL
-      case 'fire':
-        return FIRE
-      case 'lava':
-        return LAVA
-      case 'water':
-        return WATER
-      case 'solid':
-        return SOLID
-      case 'spring':
-        return SPRING
-      case 'volcanic':
-        return VOLCANIC
-      case 'oil well':
-        return OIL_WELL
-      case 'life':
-        return LIFE
-      case 'C4':
-        return C4
-      default:
-        return 0
     }
   }
 }
