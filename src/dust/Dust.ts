@@ -885,7 +885,9 @@ export default class Dust {
         const spawnX = flippedX + Math.floor(r * Math.sin(i))
         const spawnY = y + Math.floor(r * Math.cos(i))
 
-        if (spawnX <= 0 || spawnY <= 0 || spawnX >= WIDTH - 1 || spawnY >= HEIGHT - 1) continue
+        if (spawnX <= 0 || spawnY <= 0 || spawnX >= WIDTH - 1 || spawnY >= HEIGHT - 1) {
+          continue
+        }
 
         if (type !== 'space') {
           this.spawn(spawnX, spawnY, nType)
