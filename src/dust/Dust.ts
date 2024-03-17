@@ -75,6 +75,7 @@ export type BrushType = "sand" | "oil" | "fire" | "lava" | "water" | "steam" | "
 export type BrushModifier = "burning" | "infectant"
 
 type Brush  = {
+  active: boolean
   x: number
   y: number
   type: BrushType
@@ -215,7 +216,7 @@ export default class Dust {
 
   fpsNode: HTMLElement | null
 
-  activeBrushes: Record<number, Brush> = {}
+  brushes: Record<number, Brush> = {}
 
   constructor({ gl, fpsNode }: DustConstructor) {
     this.gl = gl
@@ -261,7 +262,7 @@ export default class Dust {
   run = () => {
     const { fpsTimer, fpsNode } = this
 
-    this.handleMice()
+    this.handleBrushes()
 
     if (!this.paused) {
       this.update()
@@ -282,24 +283,18 @@ export default class Dust {
   }
 
   private move(x1: number, y1: number, x2: number, y2: number): void {
-    if (
-      x2 < 0 ||
-      x2 > A_WIDTH ||
-      y2 < 0 ||
-      y2 > A_HEIGHT
-    ) {
-      return
-    }
+    const dest = this.getVal(x2, y2)
 
-    const d = this.grid[x1][y1]
-
-    if (this.grid[x2][y2] !== M.SPACE) {
+    if (dest !== M.SPACE) {
       console.warn('occupied!')
       return
     }
 
+    const cellValue = this.getVal(x1, y1)
+
     this.grid[x1][y1] = 0
-    this.grid[x2][y2] = d
+    this.grid[x2][y2] = cellValue
+
     this.blacklist[x1][y1] = 1
     this.blacklist[x2][y2] = 1
   }
@@ -353,17 +348,8 @@ export default class Dust {
   }
 
   private swap(x1: number, y1: number, x2: number, y2: number): void {
-    if (
-      x2 === 0 ||
-      x2 >= WIDTH - 1 ||
-      y2 === 0 ||
-      y2 >= HEIGHT - 1
-    ) {
-      return
-    }
-
-    const d1 = this.grid[x1][y1]
-    const d2 = this.grid[x2][y2]
+    const d1 = this.getVal(x1, y1)
+    const d2 = this.getVal(x2, y2)
 
     this.grid[x1][y1] = d2
     this.grid[x2][y2] = d1
@@ -489,8 +475,12 @@ export default class Dust {
     gl.drawArrays(gl.TRIANGLES, 0, 6)
   }
 
-  private handleMice(): void {
-    for (const [_, brush] of Object.entries(this.activeBrushes)) {
+  private handleBrushes(): void {
+    for (const [_, brush] of Object.entries(this.brushes)) {
+      if (!brush.active) {
+        continue
+      }
+
       this.spawnCircle(brush)
     }
   }
@@ -526,7 +516,7 @@ export default class Dust {
     for (const exp of this.explosions) {
       if (!exp.updated) {
         exp.update()
-        this.spawnCircle({ x: exp.x, y: exp.y, type: 'fire', size: exp.radius })
+        this.spawnCircle({ x: exp.x, y: exp.y, type: 'fire', size: exp.radius, active: true })
       }
     }
 
@@ -900,47 +890,48 @@ export default class Dust {
     id: number,
     brush: Brush
   ) => {
-    this.activeBrushes[id] = brush
+    this.brushes[id] = brush
   }
 
   removeBrush = (id: number) => {
-    delete this.activeBrushes[id]
+    delete this.brushes[id]
   }
 
-  spawnCircle = ({ x, y, type, size, infect }: Brush) => {
-    //
-    // TODO: Something to do with how we are building/displaying the texture
-    //
-    const flippedX = WIDTH - x
-    const radius = size || 10
+  private getCirclePoints (
+    centerX: number,
+    centerY: number,
+    radius: number,
+    fill: boolean = false
+  ): number[][] {
+    const results = []
 
-    if (this.dustCount >= MAX_GRAINS && type !== 'space') return
+    for(let rad = radius; rad >= (fill ? 0 : radius); rad--) {
+      for(let i = 0; i <= Math.PI * 2; i += 0.006){
+        const pX = centerX + rad * Math.cos(i)
+        const pY = centerY + rad * Math.sin(i)
+        const x = Math.round(pX)
+        const y = Math.round(pY)
 
-    let nType = typeof type === 'string' ? TYPE_MAP[type] || 0 : type
-    const segments = 500
-    const step = (2 * Math.PI) / segments
-
-    if (infect && type !== 'space') {
-      nType = (M.INFECTANT | nType)
-    }
-
-    for (let r = 0; r < radius; r++) {
-      for (let i = 0; i < 2 * Math.PI; i += step) {
-        const spawnX = flippedX + Math.floor(r * Math.sin(i))
-        const spawnY = y + Math.floor(r * Math.cos(i))
-
-        if (spawnX <= 0 || spawnY <= 0 || spawnX >= WIDTH - 1 || spawnY >= HEIGHT - 1) {
+        if (x > A_WIDTH || x < 0 || y > A_HEIGHT || y < 0) {
           continue
         }
 
-        if (type !== 'space') {
-          this.spawn(spawnX, spawnY, nType)
-        } else {
-          if (this.grid[spawnX][spawnY] !== 0) {
-            this.destroy(spawnX, spawnY)
-          }
-        }
+        results.push([Math.round(pX), Math.round(pY)])
       }
+    }
+
+    return results
+  }
+
+  spawnCircle = ({ x: centerX, y: centerY, type, size, infect }: Brush) => {
+    let nType = typeof type === 'string' ? TYPE_MAP[type] || 0 : type
+
+    if (infect && nType !== M.SPACE) {
+      nType = (M.INFECTANT | nType)
+    }
+
+    for (const [x, y] of this.getCirclePoints(WIDTH - centerX, centerY, size, true)) {
+      this.spawn(x, y, nType)
     }
   }
 
@@ -962,9 +953,31 @@ export default class Dust {
     let color
     let offset = 0
 
+    const brushOutlines: boolean[][] = []
+    for (const [_, brush] of Object.entries(this.brushes)) {
+      if (brush.active) {
+        continue
+      }
+
+      const points = this.getCirclePoints(WIDTH - brush.x, brush.y, brush.size)
+      for (const [x, y] of points) {
+        if (!brushOutlines[x]) {
+          brushOutlines[x] = []
+        }
+        brushOutlines[x][y] = true
+      }
+    }
+
     for (let x = 0; x < grid.length; x++) {
       for (let y = 0; y < grid[x].length; y++) {
         const s = grid[x][y]
+        const brush = brushOutlines[x] && brushOutlines[x][y]
+
+        if (brush) {
+          _setPixel(textureData, offset, 255, 255, 255, 255)
+          offset += 4
+          continue
+        }
 
         if (s === 0) {
           _setPixel(textureData, offset, 0, 0, 0, 0)

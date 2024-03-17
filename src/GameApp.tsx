@@ -26,16 +26,17 @@ function getBrushCoords(
   return point
 }
 
-function getEvents(e: MouseEvent | TouchEvent): { id: number, x: number, y: number }[] {
+function getEvents(e: MouseEvent | TouchEvent): { id: number, x: number, y: number, isTouch: boolean }[] {
   if (e instanceof MouseEvent) {
-    return [{ id: 0, x: e.clientX, y: e.clientY}]
+    return [{ id: 0, x: e.clientX, y: e.clientY, isTouch: false}]
   } else {
     const res = []
     for (const touch of e.targetTouches) {
       res.push({
         id: touch.identifier,
         x: touch.clientX,
-        y: touch.clientY
+        y: touch.clientY,
+        isTouch: true
       })
     }
 
@@ -49,7 +50,8 @@ interface HandleSpawnOpts {
   e: MouseEvent | TouchEvent
   selectedBrush: BrushType
   brushSize: number
-  infect: boolean
+  infect: boolean,
+  mouseIsDown: boolean
 }
 
 const handleSpawnBrush = ({
@@ -58,18 +60,20 @@ const handleSpawnBrush = ({
   e,
   selectedBrush,
   brushSize,
-  infect
+  infect,
+  mouseIsDown
 }: HandleSpawnOpts) => {
   const events = getEvents(e)
 
-  for (const { id, x, y } of events) {
+  for (const { id, x, y, isTouch } of events) {
     const rect = canvasNode.getBoundingClientRect()
     const point = getBrushCoords(
       x - rect.left,
       y - rect.top,
       canvasNode
     )
-    game.addBrush(id, { x: point.x, y: point.y, type: selectedBrush, size: brushSize, infect })
+    const active = isTouch || mouseIsDown
+    game.addBrush(id, { active, x: point.x, y: point.y, type: selectedBrush, size: brushSize, infect })
   }
 }
 
@@ -105,7 +109,7 @@ function GameApp({ levelId }: Props) {
 
     mousedown.current = true
 
-    handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize })
+    handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize, mouseIsDown: true })
   }, [selectedBrush, infect, brushSize])
 
   const handleMousemove = useCallback((e: MouseEvent | TouchEvent) => {
@@ -115,11 +119,28 @@ function GameApp({ levelId }: Props) {
 
     e.preventDefault()
 
-    if (!canvasNode || !game || !mouseIsDown) {
+    if (!canvasNode || !game) {
       return
     }
 
-    handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize })
+    if (e instanceof MouseEvent) {
+      const rect = canvasNode.getBoundingClientRect()
+      const { clientX, clientY } = e
+
+      if (
+        clientX < rect.x ||
+        clientX > rect.right ||
+        clientY < rect.y ||
+        clientY > rect.bottom
+      ) {
+        game.removeBrush(0)
+      } else {
+        handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize, mouseIsDown })
+      }
+    } else {
+        handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize, mouseIsDown: true })
+    }
+
   }, [selectedBrush, infect, brushSize])
 
   const handleMouseup = useCallback((e: MouseEvent | TouchEvent) => {
@@ -210,7 +231,7 @@ function GameApp({ levelId }: Props) {
 
     canvasNode.addEventListener('mousedown', handleMousedown)
     canvasNode.addEventListener('touchstart', handleMousedown)
-    canvasNode.addEventListener('mousemove', handleMousemove)
+    window.addEventListener('mousemove', handleMousemove)
     canvasNode.addEventListener('touchmove', handleMousemove)
     window.addEventListener('mouseup', handleMouseup)
     window.addEventListener('touchend', handleMouseup)
@@ -219,7 +240,7 @@ function GameApp({ levelId }: Props) {
     return () => {
       canvasNode.removeEventListener('mousedown', handleMousedown)
       canvasNode.removeEventListener('touchstart', handleMousedown)
-      canvasNode.removeEventListener('mousemove', handleMousemove)
+      window.removeEventListener('mousemove', handleMousemove)
       canvasNode.removeEventListener('touchmove', handleMousemove)
       window.removeEventListener('mouseup', handleMouseup)
       window.removeEventListener('touchend', handleMouseup)
