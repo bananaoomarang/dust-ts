@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import useSWR from 'swr'
 import classNames from 'classnames'
-import Dust, { BrushType } from './dust/Dust'
+import Dust, { BrushType, WIDTH, HEIGHT } from './dust/Dust'
 import Point from './dust/Point'
 import * as glUtil from './dust/gl-util'
 import MaterialSelector from './MaterialSelector'
@@ -17,11 +17,11 @@ function getBrushCoords(
 ): Point {
   const point = new Point(x, y)
   const rect = canvas.getBoundingClientRect()
-  point.x = (point.x / rect.width) * canvas.width
-  point.y = (point.y / rect.height) * canvas.height
+  point.x = (point.x / rect.width) * WIDTH
+  point.y = (point.y / rect.height) * HEIGHT
 
-  point.x = Math.min(Math.round(point.x), 500)
-  point.y = Math.min(Math.round(point.y), 500)
+  point.x = Math.min(Math.round(point.x), WIDTH)
+  point.y = Math.min(Math.round(point.y), HEIGHT)
 
   return point
 }

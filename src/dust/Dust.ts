@@ -5,41 +5,50 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 
-const WIDTH = 500
-const HEIGHT = 500
+export const WIDTH = 500
+export const HEIGHT = 500
+
+const A_WIDTH = WIDTH - 1
+const A_HEIGHT = HEIGHT - 1
+
 const MAX_GRAINS = WIDTH * HEIGHT
 
-const SAND = 1
-const OIL = 2
-const FIRE = 4
-const LAVA = 8
-const WATER = 16
-const STEAM = 32
-const SOLID = 64
-const BURNING = 256
-const LIFE = 512
-const INFECTANT = 1024
-const C4 = 2048
-const FUSE = 4096
-const SPRING = (SOLID | WATER)
-const VOLCANIC = (SOLID | LAVA)
-const OIL_WELL = (SOLID | OIL)
+const LIQUID_DISPERSAL = 50
 
-const TYPE_MAP: Record<BrushType, number> = {
-  space: 0,
-  sand: SAND,
-  oil: OIL,
-  fire: FIRE,
-  lava: LAVA,
-  water: WATER,
-  steam: STEAM,
-  solid: SOLID,
-  spring: SPRING,
-  volcanic: VOLCANIC,
-  ['oil well']: OIL_WELL,
-  life: LIFE,
-  C4: C4,
-  fuse: FUSE
+enum M {
+  SPACE = 0,
+  SAND = 1,
+  OIL = 2,
+  FIRE = 4,
+  LAVA = 8,
+  WATER = 16,
+  STEAM = 32,
+  SOLID = 64,
+  BURNING = 256,
+  LIFE = 512,
+  INFECTANT = 1024,
+  C4 = 2048,
+  FUSE = 4096,
+  SPRING = (SOLID | WATER),
+  VOLCANIC = (SOLID | LAVA),
+  OIL_WELL = (SOLID | OIL)
+}
+
+const TYPE_MAP: Record<BrushType, M> = {
+  space: M.SPACE,
+  sand: M.SAND,
+  oil: M.OIL,
+  fire: M.FIRE,
+  lava: M.LAVA,
+  water: M.WATER,
+  steam: M.STEAM,
+  solid: M.SOLID,
+  spring: M.SPRING,
+  volcanic: M.VOLCANIC,
+  ['oil well']: M.OIL_WELL,
+  life: M.LIFE,
+  C4: M.C4,
+  fuse: M.FUSE
 }
 
 export type Level = {
@@ -169,11 +178,11 @@ export default class Dust {
 
   sandVertices = new Float32Array([
     0, 0,
-    0, 500,
-    500, 0,
-    500, 0,
-    0, 500,
-    500, 500
+    0, HEIGHT,
+    WIDTH, 0,
+    WIDTH, 0,
+    0, HEIGHT,
+    WIDTH, HEIGHT
   ])
 
   texcoords = new Float32Array([
@@ -191,7 +200,7 @@ export default class Dust {
   texture: WebGLTexture | null
   textureLocation: WebGLUniformLocation | null
   texcoordLocation: WebGLUniformLocation | null
-  textureData = new Uint8ClampedArray(500 * 500 * 4)
+  textureData = new Uint8ClampedArray(WIDTH * HEIGHT * 4)
 
   grid = _create2dArray(WIDTH, HEIGHT)
   blacklist = _create2dArray(WIDTH, HEIGHT)
@@ -274,19 +283,73 @@ export default class Dust {
 
   private move(x1: number, y1: number, x2: number, y2: number): void {
     if (
-      x2 === 0 ||
-      x2 >= WIDTH - 1 ||
-      y2 === 0 ||
-      y2 >= HEIGHT - 1
+      x2 < 0 ||
+      x2 > A_WIDTH ||
+      y2 < 0 ||
+      y2 > A_HEIGHT
     ) {
       return
     }
 
     const d = this.grid[x1][y1]
 
+    if (this.grid[x2][y2] !== M.SPACE) {
+      console.warn('occupied!')
+      return
+    }
+
     this.grid[x1][y1] = 0
     this.grid[x2][y2] = d
-    this.blacklist[x1][y2] = 1
+    this.blacklist[x1][y1] = 1
+    this.blacklist[x2][y2] = 1
+  }
+
+  private getVal (x: number, y: number): M {
+    if (x < 0 || x > A_WIDTH) {
+      return M.SOLID
+    }
+
+    if (y < 0 || y > A_HEIGHT) {
+      return M.SOLID
+    }
+
+    return this.grid[x][y]
+  }
+
+  private skim(maxShift: number, x: number, y: number): void {
+    const dir = maxShift > 0 ? 1 : -1
+
+    const absMaxShift = Math.abs(maxShift)
+    for (let i = 1, fallen = 0; i <= absMaxShift; i++) {
+      const currentY = y + fallen
+      const currentX = x + (i * dir)
+      const nextX = x + ((i + 1) * dir)
+
+      const nextCell = this.getVal(nextX, currentY)
+
+      if (nextCell !== M.SPACE) {
+        this.move(x, y, currentX, currentY)
+        break
+      }
+
+      const below = this.getVal(currentX, currentY + 1)
+
+      if (below === M.SPACE) {
+        this.move(x, y, currentX, currentY)
+        break
+      }
+
+      const belowNextCell = this.getVal(nextX, currentY + 1)
+
+      if (belowNextCell === M.SPACE) {
+        fallen += 1
+        continue
+      }
+
+      if (i === absMaxShift) {
+        this.move(x, y, currentX, currentY)
+      }
+    }
   }
 
   private swap(x1: number, y1: number, x2: number, y2: number): void {
@@ -312,13 +375,13 @@ export default class Dust {
   private update() {
     let lived = false
 
-    let rx = Math.floor(Math.random() * 500) % (this.grid.length - 1)
+    let rx = Math.floor(Math.random() * WIDTH) % (this.grid.length - 1)
     const xIncrement = 8
 
     for (let x = 1; x < this.grid.length - 1; x++) {
       const yLen = this.grid[x].length - 1
 
-      let ry = Math.floor(Math.random() * 500) % yLen
+      let ry = Math.floor(Math.random() * HEIGHT) % yLen
       const yIncrement = 2
 
       rx = (rx + xIncrement) % yLen
@@ -351,17 +414,17 @@ export default class Dust {
 
         this.updateSprings(d, rx, ry)
 
-        if (d & SOLID) {
+        if (d & M.SOLID) {
           continue
         }
 
         this.updateExplosions()
 
-        if (d & INFECTANT) {
+        if (d & M.INFECTANT) {
           this.updateInfections(rx, ry)
         }
 
-        if (d & LIFE) {
+        if (d & M.LIFE) {
           if (this.updateLife(rx, ry)) {
             lived = true
           }
@@ -369,7 +432,7 @@ export default class Dust {
 
         this.updateFire(d, rx, ry)
 
-        if (d & LIFE || d & C4 || d & FUSE) {
+        if (d & M.LIFE || d & M.C4 || d & M.FUSE) {
           continue
         }
 
@@ -378,9 +441,9 @@ export default class Dust {
 
         if (this.grid[rx][ry + 1] === 0) {
           this.move(rx, ry, rx, ry + 1)
+        } else {
+          this.updateGeneric(rx, ry, material, xDir)
         }
-
-        this.updateGeneric(rx, ry, material, xDir)
       }
     }
 
@@ -436,22 +499,22 @@ export default class Dust {
     //
     // This is a spring
     //
-    if (cellValue & WATER && cellValue & SOLID) {
-      this.infect(x, y, 0, WATER)
+    if (cellValue & M.WATER && cellValue & M.SOLID) {
+      this.infect(x, y, 0, M.WATER)
     }
 
     //
     // Oil spring
     //
-    if (cellValue & OIL && cellValue & SOLID) {
-      this.infect(x, y, 0, OIL)
+    if (cellValue & M.OIL && cellValue & M.SOLID) {
+      this.infect(x, y, 0, M.OIL)
     }
 
     //
     // Lava spring
     //
-    if (cellValue & LAVA && cellValue & SOLID) {
-      this.infect(x, y, 0, LAVA)
+    if (cellValue & M.LAVA && cellValue & M.SOLID) {
+      this.infect(x, y, 0, M.LAVA)
     }
   }
 
@@ -486,7 +549,7 @@ export default class Dust {
     const neighbours = this.countNeighbours(x, y)
 
     if (neighbours === 3) {
-      this.spawn(x, y, LIFE)
+      this.spawn(x, y, M.LIFE)
     }
 
     //
@@ -498,7 +561,7 @@ export default class Dust {
   private onInfectSurrounds = (x: number, y: number, cellValue: number) => {
     const cell = this.grid[x][y]
 
-    if (cell & INFECTANT) {
+    if (cell & M.INFECTANT) {
       return
     }
 
@@ -540,12 +603,12 @@ export default class Dust {
   // Handle fire, burning and things of that nature
   //
   private updateFire(cellValue: number, x: number, y: number): void {
-    if (cellValue & FIRE && Math.random() > 0.8) {
-      this.grid[x][y] |= BURNING
+    if (cellValue & M.FIRE && Math.random() > 0.8) {
+      this.grid[x][y] |= M.BURNING
     }
 
-    if (cellValue & BURNING && Math.random() > 0.8 && !this.blacklist[x][y]) {
-      if (cellValue & C4) {
+    if (cellValue & M.BURNING && Math.random() > 0.8 && !this.blacklist[x][y]) {
+      if (cellValue & M.C4) {
         this.explode(x, y, 40, 100)
       }
 
@@ -555,14 +618,14 @@ export default class Dust {
     }
 
     // Burn baby burn
-    if (cellValue & FIRE || cellValue & LAVA || cellValue & BURNING) {
-      this.infect(x, y, LIFE, BURNING)
-      this.infect(x, y, C4, BURNING)
-      this.infect(x, y, FUSE, BURNING)
+    if (cellValue & M.FIRE || cellValue & M.LAVA || cellValue & M.BURNING) {
+      this.infect(x, y, M.LIFE, M.BURNING)
+      this.infect(x, y, M.C4, M.BURNING)
+      this.infect(x, y, M.FUSE, M.BURNING)
 
       if (Math.random() > 0.5) {
-        this.infect(x, y, OIL, BURNING)
-        this.infect(x, y, WATER, STEAM, WATER)
+        this.infect(x, y, M.OIL, M.BURNING)
+        this.infect(x, y, M.WATER, M.STEAM, M.WATER)
       }
     }
   }
@@ -571,20 +634,20 @@ export default class Dust {
     //
     // Chance that steam will condense + it will condense if it's surrounded by steam
     //
-    if (cellValue & STEAM) {
+    if (cellValue & M.STEAM) {
       if (Math.random() > 0.9999) {
-        this.spawn(x, y, WATER)
+        this.spawn(x, y, M.WATER)
       } else if (this.surrounded(x, y)) {
-        this.spawn(x, y, WATER)
+        this.spawn(x, y, M.WATER)
       }
     }
 
     //
     // Put out fires
     //
-    if (cellValue & WATER && Math.random() > 0.5) {
-      this.runOnSurrounds(x, y, this.onWaterSurrounds, FIRE)
-      this.infect(x, y, BURNING, BURNING)
+    if (cellValue & M.WATER && Math.random() > 0.5) {
+      this.runOnSurrounds(x, y, this.onWaterSurrounds, M.FIRE)
+      this.infect(x, y, M.BURNING, M.BURNING)
     }
   }
 
@@ -604,7 +667,7 @@ export default class Dust {
     }
 
     if (material.density < materialAbove.density) {
-      if (cellValue & FIRE) {
+      if (cellValue & M.FIRE) {
         this.swap(x, y, x, y - 1)
       } else if (Math.random() < 0.7) {
         this.swap(x, y, x + xDir, y - 1)
@@ -614,37 +677,18 @@ export default class Dust {
     }
   }
 
-  //
-  // NB This code is paraphrased from http://pok5.de/elementdots/js/dots.js, so full credit where it's due.
-  //
   private updateGeneric(x: number, y: number, material: Material, xDir: number): void {
-    if (material.liquid && x + 3 < WIDTH && x - 3 > 0) {
-      const r1 = this.grid[x + 1][y]
-      const r2 = this.grid[x + 2][y]
-      const r3 = this.grid[x + 3][y]
-      const l1 = this.grid[x - 1][y]
-      const l2 = this.grid[x - 2][y]
-      const l3 = this.grid[x - 3][y]
-      const c = this.grid[x][y]
+    const left = this.getVal(x - 1, y)
+    const right = this.getVal(x + 1, y)
+    const below = this.getVal(x, y + 1)
 
-      const w = ((r1 === c) ? 1 : 0) + ((r2 === c) ? 1 : 0) + ((r3 === c) ? 1 : 0) - ((l1 === c) ? 1 : 0) - ((l2 === c) ? 1 : 0) - ((l3 === c) ? 1 : 0)
-
-      if (w <= 0 && Math.random() < 0.5) {
-        if (r1 === 0 && this.grid[x + 1][y - 1] !== c) {
-          this.move(x, y, x + 1, y)
-        } else if (r2 === 0 && this.grid[x + 2][y - 1] !== c) {
-          this.move(x, y, x + 2, y)
-        } else if (r3 === 0 && this.grid[x + 3][y - 1] !== c) {
-          this.move(x, y, x + 3, y)
-        }
-      } else if (w >= 0 && Math.random() < 0.5) {
-        if (l1 === 0 && this.grid[x - 1][y - 1] !== c) {
-          this.move(x, y, x - 1, y)
-        } else if (l2 === 0 && this.grid[x - 2][y - 1] !== c) {
-          this.move(x, y, x - 2, y)
-        } else if (l3 === 0 && this.grid[x - 3][y - 1] !== c) {
-          this.move(x, y, x - 3, y)
-        }
+    if (material.liquid && below !== 0) {
+      if (left === 0 && right === 0) {
+        this.skim(xDir, x, y)
+      } else if (left === 0) {
+        this.skim(-LIQUID_DISPERSAL, x, y)
+      } else if (right === 0) {
+        this.skim(LIQUID_DISPERSAL, x, y)
       }
     } else {
       if (this.grid[x + xDir][y + 1] === 0) {
@@ -654,17 +698,17 @@ export default class Dust {
   }
 
   private getMaterial(s: number): Material {
-    if (s === 0) return MATERIALS.space
-    if (s & SAND) return MATERIALS.sand
-    if (s & OIL) return MATERIALS.oil
-    if (s & FIRE) return MATERIALS.fire
-    if (s & WATER) return MATERIALS.water
-    if (s & STEAM) return MATERIALS.steam
-    if (s & LAVA) return MATERIALS.lava
-    if (s & LIFE) return MATERIALS.life
-    if (s & C4) return MATERIALS.C4
-    if (s & FUSE) return MATERIALS.fuse
-    if (s & SOLID) return MATERIALS.solid
+    if (s === M.SPACE) return MATERIALS.space
+    if (s & M.SAND) return MATERIALS.sand
+    if (s & M.OIL) return MATERIALS.oil
+    if (s & M.FIRE) return MATERIALS.fire
+    if (s & M.WATER) return MATERIALS.water
+    if (s & M.STEAM) return MATERIALS.steam
+    if (s & M.LAVA) return MATERIALS.lava
+    if (s & M.LIFE) return MATERIALS.life
+    if (s & M.C4) return MATERIALS.C4
+    if (s & M.FUSE) return MATERIALS.fuse
+    if (s & M.SOLID) return MATERIALS.solid
 
     return MATERIALS.space
   }
@@ -877,7 +921,7 @@ export default class Dust {
     const step = (2 * Math.PI) / segments
 
     if (infect && type !== 'space') {
-      nType = (INFECTANT | nType)
+      nType = (M.INFECTANT | nType)
     }
 
     for (let r = 0; r < radius; r++) {
@@ -930,7 +974,7 @@ export default class Dust {
 
         const material = this.getMaterial(s)
 
-        if (s & BURNING && material.burnColors) {
+        if (s & M.BURNING && material.burnColors) {
           color = (Math.random() > 0.1)
             ? [material.burnColors[0], material.burnColors[1], material.burnColors[2]]
             : [material.burnColors[3], material.burnColors[4], material.burnColors[5]]
