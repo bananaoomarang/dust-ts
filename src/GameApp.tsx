@@ -117,11 +117,11 @@ function GameApp({ levelId }: Props) {
     const game = dust.current
     const mouseIsDown = mousedown.current
 
-    e.preventDefault()
-
     if (!canvasNode || !game) {
       return
     }
+
+    let handled = false
 
     if (e instanceof MouseEvent) {
       const rect = canvasNode.getBoundingClientRect()
@@ -136,11 +136,17 @@ function GameApp({ levelId }: Props) {
         game.removeBrush(0)
       } else {
         handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize, mouseIsDown })
+        handled = true
       }
     } else {
-        handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize, mouseIsDown: true })
+      handleSpawnBrush({ game, canvasNode, e, selectedBrush, infect, brushSize, mouseIsDown: true })
+      handled = true
     }
 
+
+    if (handled) {
+      e.preventDefault()
+    }
   }, [selectedBrush, infect, brushSize])
 
   const handleMouseup = useCallback((e: MouseEvent | TouchEvent) => {

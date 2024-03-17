@@ -386,15 +386,15 @@ export default class Dust {
           continue
         }
 
+        if (this.blacklist[rx][ry]) {
+          continue
+        }
+
         const d = this.grid[rx][ry]
         const material = this.getMaterial(d)
         const xDir = Math.random() < 0.5 ? 1 : -1
 
         if (d === 0) {
-          continue
-        }
-
-        if (this.blacklist[rx][ry]) {
           continue
         }
 
@@ -645,14 +645,15 @@ export default class Dust {
   // Handle changes due to material density
   //
   private updateFloating(cellValue: number, x: number, y: number, material: Material, xDir: number): void {
+    if (typeof material.density === 'undefined') {
+      return
+    }
+
     const materialAbove = this.getMaterial(
       this.grid[x][y - 1]
     )
 
-    if (
-      typeof material.density === 'undefined' ||
-      typeof materialAbove.density === 'undefined'
-    ) {
+    if (typeof materialAbove.density === 'undefined') {
       return
     }
 
@@ -668,11 +669,10 @@ export default class Dust {
   }
 
   private updateGeneric(x: number, y: number, material: Material, xDir: number): void {
-    const left = this.getVal(x - 1, y)
-    const right = this.getVal(x + 1, y)
-    const below = this.getVal(x, y + 1)
+    if (material.liquid && this.getVal(x, y + 1) !== 0) {
+      const left = this.getVal(x - 1, y)
+      const right = this.getVal(x + 1, y)
 
-    if (material.liquid && below !== 0) {
       if (left === 0 && right === 0) {
         this.skim(xDir, x, y)
       } else if (left === 0) {
