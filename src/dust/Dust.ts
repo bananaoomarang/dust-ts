@@ -178,6 +178,7 @@ export default class Dust {
 
   private _gravity: Vec = [0, 1]
   private _leftRight: [Vec, Vec] = [[-1, 0], [1, 0]]
+  private _up: Vec = [0, -1]
 
   fpsTimer = new Timer()
   frameCounter = 0
@@ -294,8 +295,17 @@ export default class Dust {
   set gravity(gravity: Vec) {
     const [gx, gy] = gravity
 
-    this._gravity = gravity
-    this._leftRight = [[-gy, gx], [gy, -gx]]
+    this._gravity[0] = gx
+    this._gravity[1] = gy
+
+    this._leftRight[0][0] = -gy
+    this._leftRight[0][1] = gx
+
+    this._leftRight[1][0] = gy
+    this._leftRight[1][1] = -gx
+
+    this._up[0] = -gx
+    this._up[1] = -gy
   }
 
   private move(x1: number, y1: number, x2: number, y2: number): void {
@@ -351,7 +361,7 @@ export default class Dust {
         break
       }
 
-      const below = this.getNextPoint([currentX, currentY], this.gravity)
+      const below = this.getNextPoint([currentY, currentX], this.gravity)
 
       if (below === M.SPACE) {
         this.move(x, y, currentX, currentY)
@@ -394,6 +404,10 @@ export default class Dust {
   }
 
   private swap(x1: number, y1: number, x2: number, y2: number): void {
+    if (!this.isWithinBounds(x2, y2)) {
+      return
+    }
+
     const d1 = this.getVal(x1, y1)
     const d2 = this.getVal(x2, y2)
 
@@ -459,7 +473,7 @@ export default class Dust {
         }
 
         this.updateWater(d, rx, ry)
-        // this.updateFloating(d, rx, ry, material, xDir)
+        this.updateFloating(d, rx, ry, material, xDir)
 
         const fell = this.updateGravity(rx, ry)
 
@@ -685,21 +699,41 @@ export default class Dust {
       return
     }
 
+    const [ux, uy] = this._up
+    const [sideX, sideY] = xDir === -1 ? this._leftRight[0] : this._leftRight[1]
+
+    const aboveX = Math.round(x + ux)
+    const aboveY = Math.round(y + uy)
+    const aboveSideX = Math.round(x + sideX + ux)
+    const aboveSideY = Math.round(y + sideY + uy)
+
+    if (!this.isWithinBounds(aboveX, aboveY)) {
+      return
+    }
+
     const materialAbove = this.getMaterial(
-      this.grid[x][y - 1]
+      this.grid[aboveX][aboveY]
     )
 
     if (typeof materialAbove.density === 'undefined') {
       return
     }
 
+    if (!this.isWithinBounds(aboveSideX, aboveSideY)) {
+      return
+    }
+
+    const materialAboveSide = this.getMaterial(
+      this.grid[aboveSideX][aboveSideY]
+    )
+
     if (material.density < materialAbove.density) {
       if (cellValue & M.FIRE) {
-        this.swap(x, y, x, y - 1)
-      } else if (Math.random() < 0.7) {
-        this.swap(x, y, x + xDir, y - 1)
+        this.swap(x, y, aboveX, aboveY)
+      } else if (Math.random() < 0.7 && typeof materialAboveSide.density !== 'undefined') {
+        this.swap(x, y, aboveSideX, aboveSideY)
       } else {
-        this.swap(x, y, x, y - 1)
+        this.swap(x, y, aboveX, aboveY)
       }
     }
   }
@@ -712,10 +746,12 @@ export default class Dust {
       return false
     }
 
-    const [nx, ny] = p[p.length - 1].map(Math.round)
+    const np = p[0]
+    np[0] = Math.round(np[0])
+    np[1] = Math.round(np[1])
 
-    if (this.getVal(nx, ny) === M.SPACE) {
-      this.move(x, y, nx, ny)
+    if (this.getVal(np[0], np[1]) === M.SPACE) {
+      this.move(x, y, np[0], np[1])
       return true
     }
 
@@ -740,7 +776,7 @@ export default class Dust {
       const right = this.getNextPoint([x, y], this._leftRight[1])
 
       if (left === M.SPACE && right === M.SPACE) {
-        this.skim(xDir, x, y)
+        this.skim(xDir * LIQUID_DISPERSAL, x, y)
       } else if (left === M.SPACE) {
         this.skim(-LIQUID_DISPERSAL, x, y)
       } else if (right === M.SPACE) {
@@ -754,11 +790,10 @@ export default class Dust {
       if (points.length === 0) {
         return
       }
+      const p = points[0]
 
-      const [nextX, nextY] = points[0]
-
-      if (this.getVal(nextX, nextY) === M.SPACE) {
-        this.move(x, y, nextX, nextY)
+      if (this.getVal(p[0], p[1]) === M.SPACE) {
+        this.move(x, y, p[0], p[1])
       } 
     }
   }
@@ -865,16 +900,16 @@ export default class Dust {
   }
 
   private surrounded(x: number, y: number): boolean {
-    const cell = this.grid[x][y]
-    return !!(
-      cell === this.grid[x + 1][y] &&
-      cell === this.grid[x - 1][y] &&
-      cell === this.grid[x][y + 1] &&
-      cell === this.grid[x][y - 1] &&
-      cell === this.grid[x + 1][y + 1] &&
-      cell === this.grid[x + 1][y - 1] &&
-      cell === this.grid[x - 1][y + 1] &&
-      cell === this.grid[x - 1][y - 1]
+    const cell = this.getVal(x, y)
+    return (
+      cell === this.getVal(x + 1, y) &&
+      cell === this.getVal(x - 1, y) &&
+      cell === this.getVal(x, y + 1) &&
+      cell === this.getVal(x, y - 1) &&
+      cell === this.getVal(x + 1, y + 1) &&
+      cell === this.getVal(x + 1, y - 1) &&
+      cell === this.getVal(x - 1, y + 1) &&
+      cell === this.getVal(x - 1, y - 1)
     )
   }
 
