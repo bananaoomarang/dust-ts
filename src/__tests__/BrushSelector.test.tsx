@@ -1,13 +1,26 @@
-import { expect, test, vi } from 'vitest'
+import { expect, test, describe, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import BrushSelector from '../BrushSelector'
 
-test('Can change brush size', () => {
+describe('BrushSelector', () => {
   const setBrushSize = vi.fn()
-  render(<BrushSelector brushSize={0} setBrushSize={setBrushSize} />);
+  const setGravity = vi.fn()
 
-  const input = screen.getByLabelText(/Brush Size/i);
-  fireEvent.change(input, { target: { value: '43' }})
+  test('Can change brush size', () => {
+    render(<BrushSelector brushSize={0} setBrushSize={setBrushSize} gravity={0} setGravity={setGravity} />);
 
-  expect(setBrushSize).toBeCalledWith(43)
-});
+    const input = screen.getByLabelText(/Brush Size/i);
+    fireEvent.change(input, { target: { value: '43' }})
+
+    expect(setBrushSize).toBeCalledWith(43)
+  })
+
+  test('Can change gravity', () => {
+    render(<BrushSelector brushSize={0} setBrushSize={setBrushSize} gravity={0} setGravity={setGravity} />);
+
+    const input = screen.getByLabelText(/Gravity/i);
+    fireEvent.change(input, { target: { value: '45' }})
+
+    expect(setGravity).toBeCalledWith(45)
+  })
+})

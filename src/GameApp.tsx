@@ -89,6 +89,7 @@ function GameApp({ levelId }: Props) {
   const [selectedBrush, setSelectedBrush] = useState<BrushType>('sand')
   const [infect, setInfect] = useState(false)
   const [brushSize, setBrushSize] = useState(10)
+  const [gravity, setGravity] = useState(0)
   const [paused, setPaused] = useState(false)
 
   const levelQuery = useSWR(levelId ? `/levels/${levelId}` : null)
@@ -199,6 +200,18 @@ function GameApp({ levelId }: Props) {
 
   useEffect(() => {
     const game = dust.current
+
+    if (!game) {
+      return
+    }
+
+    const rad = gravity * (Math.PI / 180)
+    const heading: [number, number] = [Math.sin(rad) * 2, Math.cos(rad) * 2]
+    game.gravity = heading
+  }, [gravity])
+
+  useEffect(() => {
+    const game = dust.current
     if (!game || !levelQuery.data) {
       return
     }
@@ -259,12 +272,17 @@ function GameApp({ levelId }: Props) {
       <h1 className={styles.header}>Dust</h1>
       <div className={styles.wrapper}>
         <span className={classNames(styles.fps, { [styles.show]: true })} ref={fpsLad}>0fps</span>
-        <div className={styles.canvasWrapper}>
+        <div className={styles.canvasWrapper} style={{ transform: `rotate(-${gravity}deg)`}}>
           <span className={classNames(styles.paused, { [styles.show]: paused })}>PAUSED</span>
           <canvas className={styles.canvas} ref={canvas} width="500" height="500" />
         </div>
         <MaterialSelector selected={selectedBrush} setSelected={setSelectedBrush} infect={infect} setInfect={setInfect} />
-        <BrushSelector brushSize={brushSize} setBrushSize={setBrushSize} />
+        <BrushSelector
+          brushSize={brushSize}
+          setBrushSize={setBrushSize}
+          gravity={gravity}
+          setGravity={setGravity}
+        />
       </div>
       <LevelSaver game={dust} />
       <LevelBrowser

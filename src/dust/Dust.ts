@@ -5,8 +5,8 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 
-export const WIDTH = 500
-export const HEIGHT = 500
+export const WIDTH = 100
+export const HEIGHT = 100
 
 const A_WIDTH = WIDTH - 1
 const A_HEIGHT = HEIGHT - 1
@@ -14,6 +14,8 @@ const A_HEIGHT = HEIGHT - 1
 const MAX_GRAINS = WIDTH * HEIGHT
 
 const LIQUID_DISPERSAL = 50
+
+type Vec = [number, number]
 
 enum M {
   SPACE = 0,
@@ -177,6 +179,8 @@ export default class Dust {
   fpsTimer = new Timer()
   frameCounter = 0
 
+  gravity: Vec = [0, 1]
+
   sandVertices = new Float32Array([
     0, 0,
     0, HEIGHT,
@@ -299,12 +303,12 @@ export default class Dust {
     this.blacklist[x2][y2] = 1
   }
 
-  private getVal (x: number, y: number): M {
-    if (x < 0 || x > A_WIDTH) {
-      return M.SOLID
-    }
+  private isWithinBounds (x: number, y: number): boolean {
+    return (x >= 0 && x <= A_WIDTH && y >= 0 && y <= A_HEIGHT)
+  }
 
-    if (y < 0 || y > A_HEIGHT) {
+  private getVal (x: number, y: number): M {
+    if (!this.isWithinBounds(x, y)) {
       return M.SOLID
     }
 
@@ -362,29 +366,19 @@ export default class Dust {
     let lived = false
 
     let rx = Math.floor(Math.random() * WIDTH) % (this.grid.length - 1)
-    const xIncrement = 8
+    const xLen = this.grid.length
+    const xIncrement = 1
 
-    for (let x = 1; x < this.grid.length - 1; x++) {
-      const yLen = this.grid[x].length - 1
+    for (let x = 0; x < this.grid.length; x++) {
+      const yLen = this.grid[x].length
 
       let ry = Math.floor(Math.random() * HEIGHT) % yLen
-      const yIncrement = 2
+      const yIncrement = 1
 
-      rx = (rx + xIncrement) % yLen
+      rx = (rx + xIncrement) % xLen
 
-      if (rx === 0 || rx === this.grid[x].length) {
-        continue
-      }
-
-      for (let y = this.grid[x].length; y > 0; y--) {
+      for (let y = this.grid[x].length - 1; y >= 0; y--) {
         ry = (ry + yIncrement) % yLen
-
-        //
-        // Skip if we think we are out of bounds
-        //
-        if (ry === 0 || ry === this.grid[x].length) {
-          continue
-        }
 
         if (this.blacklist[rx][ry]) {
           continue
@@ -425,9 +419,9 @@ export default class Dust {
         this.updateWater(d, rx, ry)
         this.updateFloating(d, rx, ry, material, xDir)
 
-        if (this.grid[rx][ry + 1] === 0) {
-          this.move(rx, ry, rx, ry + 1)
-        } else {
+        const fell = this.updateGravity(rx, ry)
+
+        if (!fell) {
           this.updateGeneric(rx, ry, material, xDir)
         }
       }
@@ -668,6 +662,24 @@ export default class Dust {
     }
   }
 
+  private updateGravity(x: number, y: number): boolean {
+    const [gx, gy] = this.gravity
+    const p = this.interpolatePoints(x, y, x + gx, y + gy)
+
+    if (p.length === 0) {
+      return false
+    }
+
+    const [nx, ny] = p[p.length - 1].map(Math.round)
+
+    if (this.getVal(nx, ny) === M.SPACE) {
+      this.move(x, y, nx, ny)
+      return true
+    }
+
+    return false
+  }
+
   private updateGeneric(x: number, y: number, material: Material, xDir: number): void {
     if (material.liquid && this.getVal(x, y + 1) !== 0) {
       const left = this.getVal(x - 1, y)
@@ -681,7 +693,7 @@ export default class Dust {
         this.skim(LIQUID_DISPERSAL, x, y)
       }
     } else {
-      if (this.grid[x + xDir][y + 1] === 0) {
+      if (this.getVal(x + xDir, y + 1) === M.SPACE) {
         this.move(x, y, x + xDir, y + 1)
       } 
     }
@@ -734,14 +746,14 @@ export default class Dust {
   }
 
   private infect(x: number, y: number, flagSet: number, flagToSet: number, flagToRemove?: number): void {
-    const n = this.grid[x][y - 1]
-    const ne = this.grid[x + 1][y - 1]
-    const e = this.grid[x + 1][y]
-    const se = this.grid[x + 1][y + 1]
-    const s = this.grid[x][y + 1]
-    const sw = this.grid[x - 1][y + 1]
-    const w = this.grid[x - 1][y]
-    const nw = this.grid[x - 1][y - 1]
+    const n = this.getVal(x, y - 1)
+    const ne = this.getVal(x + 1, y - 1)
+    const e = this.getVal(x + 1, y)
+    const se = this.getVal(x + 1, y + 1)
+    const s = this.getVal(x, y + 1)
+    const sw = this.getVal(x - 1, y + 1)
+    const w = this.getVal(x - 1, y)
+    const nw = this.getVal(x - 1, y - 1)
 
     if (flagSet === -1) {
       // Infect ANYTHING apart from NOTHING
@@ -813,14 +825,14 @@ export default class Dust {
   ): void {
     const cellValue = this.grid[x][y]
 
-    const n = this.grid[x][y - 1]
-    const ne = this.grid[x + 1][y - 1]
-    const e = this.grid[x + 1][y]
-    const se = this.grid[x + 1][y + 1]
-    const s = this.grid[x][y + 1]
-    const sw = this.grid[x - 1][y + 1]
-    const w = this.grid[x - 1][y]
-    const nw = this.grid[x - 1][y - 1]
+    const n = this.getVal(x, y - 1)
+    const ne = this.getVal(x + 1, y - 1)
+    const e = this.getVal(x + 1, y)
+    const se = this.getVal(x + 1, y + 1)
+    const s = this.getVal(x, y + 1)
+    const sw = this.getVal(x - 1, y + 1)
+    const w = this.getVal(x - 1, y)
+    const nw = this.getVal(x - 1, y - 1)
 
     if (flag) {
       if (n & flag) f(x, y - 1, cellValue)
@@ -895,6 +907,47 @@ export default class Dust {
 
   removeBrush = (id: number) => {
     delete this.brushes[id]
+  }
+
+  private interpolatePoints(x1: number, y1: number, x2: number, y2: number): Vec[] {
+    const xDiff = x1 - x2
+    const yDiff = y1 - y2
+    const xDiffIsLarger = Math.abs(xDiff) > Math.abs(yDiff)
+
+    const xModifier = xDiff < 0 ? 1 : -1
+    const yModifier = yDiff < 0 ? 1 : -1
+
+    const upperBound = Math.max(Math.abs(xDiff), Math.abs(yDiff))
+    const min = Math.min(Math.abs(xDiff), Math.abs(yDiff))
+    const slope = (min === 0 || upperBound === 0) ? 0 : ((min + 1) / (upperBound + 1))
+
+    const points = []
+
+    let smallerCount = 0
+    for (let i = 1; i <= upperBound; i++) {
+      smallerCount = Math.floor(i * slope)
+
+      let yIncrease = 0
+      let xIncrease = 0
+
+      if (xDiffIsLarger) {
+        xIncrease = i
+        yIncrease = smallerCount
+      } else {
+        yIncrease = i
+        xIncrease = smallerCount
+      }
+
+      const currentY = y1 + (yIncrease * yModifier)
+      const currentX = x1 + (xIncrease * xModifier)
+
+      if (this.isWithinBounds(currentX, currentY)) {
+        const p: Vec = [currentX, currentY]
+        points.push(p)
+      }
+    }
+
+    return points
   }
 
   private getCirclePoints (
