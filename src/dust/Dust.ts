@@ -5,8 +5,8 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 
-export const WIDTH = 100
-export const HEIGHT = 100
+export const WIDTH = 500
+export const HEIGHT = 500
 
 const A_WIDTH = WIDTH - 1
 const A_HEIGHT = HEIGHT - 1
