@@ -5,15 +5,13 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 
-export const WIDTH = 500
-export const HEIGHT = 500
+export const WIDTH = 100
+export const HEIGHT = 100
 
 const A_WIDTH = WIDTH - 1
 const A_HEIGHT = HEIGHT - 1
 
-const MAX_GRAINS = WIDTH * HEIGHT
-
-const LIQUID_DISPERSAL = Math.round(0.05 * WIDTH)
+const LIQUID_DISPERSAL = 7
 
 type Vec = [number, number]
 
@@ -177,7 +175,8 @@ export default class Dust {
   gl: WebGLRenderingContext
 
   private _gravity: Vec = [0, 1]
-  private _leftRight: [Vec, Vec] = [[-1, 0], [1, 0]]
+  private _left: Vec = [-1, 0]
+  private _right: Vec = [1, 0]
   private _up: Vec = [0, -1]
 
   fpsTimer = new Timer()
@@ -215,8 +214,6 @@ export default class Dust {
 
   lifeTimer = new Timer()
   lifeTime = 50
-
-  dustCount = 0
 
   paused = false
 
@@ -258,12 +255,15 @@ export default class Dust {
     gl.bindTexture(gl.TEXTURE_2D, this.texture)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     if (!this.texture) {
       throw new Error('Could not create texture')
     }
   }
+
+  step = false
 
   run = () => {
     const { fpsTimer, fpsNode } = this
@@ -285,7 +285,9 @@ export default class Dust {
       this.frameCounter = 0
     }
 
-    window.requestAnimationFrame(this.run)
+    if (!this.step) {
+      window.requestAnimationFrame(this.run)
+    }
   }
 
   get gravity() {
@@ -298,11 +300,11 @@ export default class Dust {
     this._gravity[0] = gx
     this._gravity[1] = gy
 
-    this._leftRight[0][0] = -gy
-    this._leftRight[0][1] = gx
+    this._left[0] = gy
+    this._left[1] = -gx
 
-    this._leftRight[1][0] = gy
-    this._leftRight[1][1] = -gx
+    this._right[0] = -gy
+    this._right[1] = gx
 
     this._up[0] = -gx
     this._up[1] = -gy
@@ -321,7 +323,6 @@ export default class Dust {
     this.grid[x1][y1] = 0
     this.grid[x2][y2] = cellValue
 
-    this.blacklist[x1][y1] = 1
     this.blacklist[x2][y2] = 1
   }
 
@@ -339,13 +340,18 @@ export default class Dust {
 
   private skim(maxShift: number, x: number, y: number): void {
     const absShift = Math.abs(maxShift)
-    const dir = maxShift > 0 ? 1 : -1
-    const [cx, cy] = dir === -1 ? this._leftRight[0] : this._leftRight[1]
+    const dir = maxShift < 0 ? -1 : 1
+    const [cx, cy] = dir === -1 ? this._left : this._right
     const points = this.interpolatePoints(x, y, x + (cx * absShift), y + (cy * absShift))
 
     for (let i = 0; i < points.length; i++) {
       const hasNext = !!points[i + 1]
       const [currentX, currentY] = points[i]
+      const currentVal = this.getVal(currentX, currentY)
+
+      if (currentVal !== M.SPACE) {
+        break
+      }
 
       if (!hasNext) {
         if (i > 0) {
@@ -355,18 +361,24 @@ export default class Dust {
       }
 
       const [nextX, nextY] = points[i + 1]
+      const nextVal = this.getVal(nextX, nextY)
 
-      if (this.getVal(nextX, nextY) !== M.SPACE) {
+      if (nextVal !== M.SPACE) {
         this.move(x, y, currentX, currentY)
         break
       }
 
-      const below = this.getNextPoint([currentY, currentX], this.gravity)
+      const belowPoints = this.interpolatePoints(
+        currentX,
+        currentY,
+        currentX + this.gravity[0],
+        currentY + this.gravity[1]
+      )
 
-      if (below === M.SPACE) {
-        this.move(x, y, currentX, currentY)
+      if (belowPoints.length && this.getVal(belowPoints[0][0], belowPoints[0][1]) === M.SPACE) {
+        this.move(x, y, belowPoints[0][0], belowPoints[0][1])
         break
-      }
+      } 
     }
 
     // const absMaxShift = Math.abs(maxShift)
@@ -374,7 +386,6 @@ export default class Dust {
     //   const currentY = y + fallen
     //   const currentX = x + (i * dir)
     //   const nextX = x + ((i + 1) * dir)
-    //   const nextY = y + 
 
     //   const nextCell = this.getVal(nextX, currentY)
 
@@ -421,20 +432,26 @@ export default class Dust {
   private update() {
     let lived = false
 
-    let rx = Math.floor(Math.random() * WIDTH) % (this.grid.length - 1)
-    const xLen = this.grid.length
-    const xIncrement = 1
 
+    const xLen = A_WIDTH
+    const yLen = A_HEIGHT
+    const xIncrement = 8
+    const yIncrement = 2
+
+    const randomX = Math.floor(Math.random() * WIDTH)
+    let rx = randomX % A_WIDTH
+
+    let flip = false
     for (let x = 0; x < this.grid.length; x++) {
-      const yLen = this.grid[x].length
-
-      let ry = Math.floor(Math.random() * HEIGHT) % yLen
-      const yIncrement = 1
+      let ry = Math.floor(Math.random() * HEIGHT) % A_HEIGHT
 
       rx = (rx + xIncrement) % xLen
+      rx = flip ? WIDTH - x : x
+      flip = !flip
 
-      for (let y = this.grid[x].length - 1; y >= 0; y--) {
+      for (let y = A_HEIGHT; y >= 0; y--) {
         ry = (ry + yIncrement) % yLen
+        ry = y
 
         if (this.blacklist[rx][ry]) {
           continue
@@ -475,10 +492,12 @@ export default class Dust {
         this.updateWater(d, rx, ry)
         this.updateFloating(d, rx, ry, material, xDir)
 
-        const fell = this.updateGravity(rx, ry)
+        if (material.density && material.density > 0) {
+          const fell = this.updateGravity(rx, ry)
 
-        if (!fell) {
-          this.updateGeneric(rx, ry, material, xDir)
+          if (!fell) {
+            this.updateGeneric(rx, ry, material, xDir)
+          }
         }
       }
     }
@@ -700,7 +719,7 @@ export default class Dust {
     }
 
     const [ux, uy] = this._up
-    const [sideX, sideY] = xDir === -1 ? this._leftRight[0] : this._leftRight[1]
+    const [sideX, sideY] = xDir === -1 ? this._left : this._right
 
     const aboveX = Math.round(x + ux)
     const aboveY = Math.round(y + uy)
@@ -772,8 +791,15 @@ export default class Dust {
 
   private updateGeneric(x: number, y: number, material: Material, xDir: number): void {
     if (material.liquid && this.getNextPoint([x, y], this.gravity) !== M.SPACE) {
-      const left = this.getNextPoint([x, y], this._leftRight[0])
-      const right = this.getNextPoint([x, y], this._leftRight[1])
+      const above = this.getNextPoint([x, y], this._up)
+      const below = this.getNextPoint([x, y], this._gravity)
+
+      if (above === M.SPACE && below === M.SPACE) {
+        return
+      }
+
+      const left = this.getNextPoint([x, y], this._left)
+      const right = this.getNextPoint([x, y], this._right)
 
       if (left === M.SPACE && right === M.SPACE) {
         this.skim(xDir * LIQUID_DISPERSAL, x, y)
@@ -784,7 +810,7 @@ export default class Dust {
       }
     } else {
       const [gx, gy] = this._gravity
-      const [cx, cy] = xDir === -1  ? this._leftRight[0] : this._leftRight[1]
+      const [cx, cy] = xDir === -1  ? this._left : this._right
       const points = this.interpolatePoints(x, y, x + gx + cx, y + gy + cy)
 
       if (points.length === 0) {
@@ -823,11 +849,15 @@ export default class Dust {
   }
 
   private spawn(x: number, y: number, type: number): void {
-    if (x === 0 || x === WIDTH - 1 || y === 0 || y === HEIGHT - 1 || this.grid[x][y] & type) return
+    if (!this.isWithinBounds(x, y)) {
+      return
+    }
 
-    if (this.dustCount <= MAX_GRAINS && this.grid[x][y] === 0) {
-      this.dustCount++
+    if (this.grid[x][y] & type) {
+      return
+    }
 
+    if (this.grid[x][y] === 0) {
       this.grid[x][y] = type
       this.blacklist[x][y] = 1
     } else if (this.grid[x][y] !== 0) {
@@ -838,8 +868,6 @@ export default class Dust {
 
   private destroy(x: number, y: number): void {
     if (this.grid[x][y] !== 0) {
-      this.dustCount--
-
       this.grid[x][y] = 0
     }
   }

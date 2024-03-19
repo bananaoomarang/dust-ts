@@ -188,6 +188,14 @@ function GameApp({ levelId }: Props) {
       handled = true
     }
 
+    if (e.key === 'z') {
+      game.step = !game.step
+    }
+
+    if (e.key === 'x') {
+      game.run()
+    }
+
     if (e.key === 'r') {
       game.clearLevel()
       handled = true
@@ -206,8 +214,16 @@ function GameApp({ levelId }: Props) {
     }
 
     const rad = gravity * (Math.PI / 180)
-    const heading: [number, number] = [Math.sin(rad) * 2, Math.cos(rad) * 2]
-    game.gravity = heading
+    const x = Math.sin(rad)
+    const y = Math.cos(rad)
+    const absX = Math.abs(x)
+    const absY = Math.abs(y)
+
+    if ((absX > 0 && absX < 1) || (absY > 0 && absY < 1)) {
+      game.gravity = [x * 2, y * 2]
+    } else {
+      game.gravity = [x, y]
+    }
   }, [gravity])
 
   useEffect(() => {
