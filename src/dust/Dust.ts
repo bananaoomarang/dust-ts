@@ -4,6 +4,7 @@ import vertShader from './shaders/vert.glsl?raw'
 import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
+import { getRandomStepParams } from './random-shuffler'
 
 export const WIDTH = 500
 export const HEIGHT = 500
@@ -380,38 +381,6 @@ export default class Dust {
         break
       } 
     }
-
-    // const absMaxShift = Math.abs(maxShift)
-    // for (let i = 1, fallen = 0; i <= absMaxShift; i++) {
-    //   const currentY = y + fallen
-    //   const currentX = x + (i * dir)
-    //   const nextX = x + ((i + 1) * dir)
-
-    //   const nextCell = this.getVal(nextX, currentY)
-
-    //   if (nextCell !== M.SPACE) {
-    //     this.move(x, y, currentX, currentY)
-    //     break
-    //   }
-
-    //   const below = this.getVal(currentX, currentY + 1)
-
-    //   if (below === M.SPACE) {
-    //     this.move(x, y, currentX, currentY)
-    //     break
-    //   }
-
-    //   const belowNextCell = this.getVal(nextX, currentY + 1)
-
-    //   if (belowNextCell === M.SPACE) {
-    //     fallen += 1
-    //     continue
-    //   }
-
-    //   if (i === absMaxShift) {
-    //     this.move(x, y, currentX, currentY)
-    //   }
-    // }
   }
 
   private swap(x1: number, y1: number, x2: number, y2: number): void {
@@ -431,27 +400,18 @@ export default class Dust {
 
   private update() {
     let lived = false
+    const [xPrime, xOffset] = getRandomStepParams(WIDTH)
+    const [yPrime, yOffset] = getRandomStepParams(HEIGHT)
+    let rx = 0
+    let ry = 0
 
-
-    const xLen = A_WIDTH
-    const yLen = A_HEIGHT
-    const xIncrement = 8
-    const yIncrement = 2
-
-    const randomX = Math.floor(Math.random() * WIDTH)
-    let rx = randomX % A_WIDTH
-
-    let flip = false
+    const visited: Record<number, boolean> = {}
     for (let x = 0; x < this.grid.length; x++) {
-      let ry = Math.floor(Math.random() * HEIGHT) % A_HEIGHT
-
-      rx = (rx + xIncrement) % xLen
-      rx = flip ? WIDTH - x : x
-      flip = !flip
+      rx = (x * xPrime + xOffset) % WIDTH
+      visited[rx] = true
 
       for (let y = A_HEIGHT; y >= 0; y--) {
-        ry = (ry + yIncrement) % yLen
-        ry = y
+        ry = (y * yPrime + yOffset) % HEIGHT
 
         if (this.blacklist[rx][ry]) {
           continue
@@ -714,7 +674,7 @@ export default class Dust {
   // Handle changes due to material density
   //
   private updateFloating(cellValue: number, x: number, y: number, material: Material, xDir: number): void {
-    if (typeof material.density === 'undefined') {
+    if (!material.density && material.density !== 0) {
       return
     }
 
@@ -734,7 +694,7 @@ export default class Dust {
       this.grid[aboveX][aboveY]
     )
 
-    if (typeof materialAbove.density === 'undefined') {
+    if (!materialAbove.density && materialAbove.density !== 0) {
       return
     }
 
@@ -749,7 +709,7 @@ export default class Dust {
     if (material.density < materialAbove.density) {
       if (cellValue & M.FIRE) {
         this.swap(x, y, aboveX, aboveY)
-      } else if (Math.random() < 0.7 && typeof materialAboveSide.density !== 'undefined') {
+      } else if (Math.random() < 0.7 && (materialAboveSide.density || materialAboveSide.density === 0)) {
         this.swap(x, y, aboveSideX, aboveSideY)
       } else {
         this.swap(x, y, aboveX, aboveY)
