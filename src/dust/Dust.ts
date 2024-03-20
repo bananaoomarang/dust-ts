@@ -5,6 +5,7 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 import { getRandomStepParams } from './random-shuffler'
+import Interpolator, { Vec } from './Interpolator'
 
 export const WIDTH = 500
 export const HEIGHT = 500
@@ -13,8 +14,6 @@ const A_WIDTH = WIDTH - 1
 const A_HEIGHT = HEIGHT - 1
 
 const LIQUID_DISPERSAL = 7
-
-type Vec = [number, number]
 
 enum M {
   SPACE = 0,
@@ -167,6 +166,10 @@ const MATERIALS: Record<string, Material> = {
   }
 }
 
+const MATERIAL_MAP: Record<number, Material> = {
+  [M.SAND]: MATERIALS.sand
+}
+
 interface DustConstructor {
   gl: WebGLRenderingContext,
   fpsNode: HTMLElement | null
@@ -212,6 +215,8 @@ export default class Dust {
   grid = _create2dArray(WIDTH, HEIGHT)
   blacklist = _create2dArray(WIDTH, HEIGHT)
   explosions: Explosion[] = []
+
+  interpolator: Interpolator = new Interpolator()
 
   lifeTimer = new Timer()
   lifeTime = 50
@@ -343,7 +348,7 @@ export default class Dust {
     const absShift = Math.abs(maxShift)
     const dir = maxShift < 0 ? -1 : 1
     const [cx, cy] = dir === -1 ? this._left : this._right
-    const points = this.interpolatePoints(x, y, x + (cx * absShift), y + (cy * absShift))
+    const points = this.interpolator.calculate(x, y, x + (cx * absShift), y + (cy * absShift))
 
     for (let i = 0; i < points.length; i++) {
       const hasNext = !!points[i + 1]
@@ -369,17 +374,17 @@ export default class Dust {
         break
       }
 
-      const belowPoints = this.interpolatePoints(
-        currentX,
-        currentY,
-        currentX + this.gravity[0],
-        currentY + this.gravity[1]
-      )
+      // const belowPoints = this.interpolatePoints(
+      //   currentX,
+      //   currentY,
+      //   currentX + this.gravity[0],
+      //   currentY + this.gravity[1]
+      // )
 
-      if (belowPoints.length && this.getVal(belowPoints[0][0], belowPoints[0][1]) === M.SPACE) {
-        this.move(x, y, belowPoints[0][0], belowPoints[0][1])
-        break
-      } 
+      // if (belowPoints.length && this.getVal(belowPoints[0][0], belowPoints[0][1]) === M.SPACE) {
+      //   this.move(x, y, belowPoints[0][0], belowPoints[0][1])
+      //   break
+      // } 
     }
   }
 
@@ -405,10 +410,8 @@ export default class Dust {
     let rx = 0
     let ry = 0
 
-    const visited: Record<number, boolean> = {}
     for (let x = 0; x < this.grid.length; x++) {
       rx = (x * xPrime + xOffset) % WIDTH
-      visited[rx] = true
 
       for (let y = A_HEIGHT; y >= 0; y--) {
         ry = (y * yPrime + yOffset) % HEIGHT
@@ -418,8 +421,6 @@ export default class Dust {
         }
 
         const d = this.grid[rx][ry]
-        const material = this.getMaterial(d)
-        const xDir = Math.random() < 0.5 ? -1 : 1
 
         if (d === 0) {
           continue
@@ -450,9 +451,11 @@ export default class Dust {
         }
 
         this.updateWater(d, rx, ry)
-        this.updateFloating(d, rx, ry, material, xDir)
 
+        const material = this.getMaterial(d)
+        const xDir = Math.random() < 0.5 ? -1 : 1
         if (material.density && material.density > 0) {
+          this.updateFloating(d, rx, ry, material, xDir)
           const fell = this.updateGravity(rx, ry)
 
           if (!fell) {
@@ -719,18 +722,17 @@ export default class Dust {
 
   private updateGravity(x: number, y: number): boolean {
     const [gx, gy] = this.gravity
-    const p = this.interpolatePoints(x, y, x + gx, y + gy)
+    const p = this.interpolator.calculate(x, y, x + gx, y + gy)
 
     if (p.length === 0) {
       return false
     }
 
-    const np = p[0]
-    np[0] = Math.round(np[0])
-    np[1] = Math.round(np[1])
+    const x2 = Math.round(p[0][0])
+    const y2 = Math.round(p[0][1])
 
-    if (this.getVal(np[0], np[1]) === M.SPACE) {
-      this.move(x, y, np[0], np[1])
+    if (this.getVal(x2, y2) === M.SPACE) {
+      this.move(x, y, x2, y2)
       return true
     }
 
@@ -740,7 +742,7 @@ export default class Dust {
   private getNextPoint(start: Vec, change: Vec): M {
     const [x, y] = start
     const [dx, dy] = change
-    const points = this.interpolatePoints(x, y, x + dx, y + dy)
+    const points = this.interpolator.calculate(x, y, x + dx, y + dy)
 
     if (points.length === 0) {
       return M.SOLID
@@ -771,20 +773,28 @@ export default class Dust {
     } else {
       const [gx, gy] = this._gravity
       const [cx, cy] = xDir === -1  ? this._left : this._right
-      const points = this.interpolatePoints(x, y, x + gx + cx, y + gy + cy)
+      // const points = this.interpolator.calculate(x, y, x + gx + cx, y + gy + cy)
 
-      if (points.length === 0) {
-        return
-      }
-      const p = points[0]
+      // if (points.length === 0) {
+      //   return
+      // }
+      // const p = points[0]
+      const nx = Math.round(x + gx + cx)
+      const ny = Math.round(y + gy + cy)
 
-      if (this.getVal(p[0], p[1]) === M.SPACE) {
-        this.move(x, y, p[0], p[1])
+      if (this.getVal(nx, ny) === M.SPACE) {
+        this.move(x, y, nx, ny)
       } 
     }
   }
 
   private getMaterial(s: number): Material {
+    if (s === 0) return MATERIALS.space
+
+    if (MATERIAL_MAP[s]) {
+      return MATERIAL_MAP[s]
+    }
+
     if (s === M.SPACE) return MATERIALS.space
     if (s & M.SAND) return MATERIALS.sand
     if (s & M.OIL) return MATERIALS.oil
@@ -994,47 +1004,6 @@ export default class Dust {
 
   removeBrush = (id: number) => {
     delete this.brushes[id]
-  }
-
-  private interpolatePoints(x1: number, y1: number, x2: number, y2: number): Vec[] {
-    const xDiff = x1 - x2
-    const yDiff = y1 - y2
-    const xDiffIsLarger = Math.abs(xDiff) > Math.abs(yDiff)
-
-    const xModifier = xDiff < 0 ? 1 : -1
-    const yModifier = yDiff < 0 ? 1 : -1
-
-    const upperBound = Math.max(Math.abs(xDiff), Math.abs(yDiff))
-    const min = Math.min(Math.abs(xDiff), Math.abs(yDiff))
-    const slope = (min === 0 || upperBound === 0) ? 0 : ((min + 1) / (upperBound + 1))
-
-    const points = []
-
-    let smallerCount = 0
-    for (let i = 1; i <= upperBound; i++) {
-      smallerCount = Math.floor(i * slope)
-
-      let yIncrease = 0
-      let xIncrease = 0
-
-      if (xDiffIsLarger) {
-        xIncrease = i
-        yIncrease = smallerCount
-      } else {
-        yIncrease = i
-        xIncrease = smallerCount
-      }
-
-      const currentY = y1 + (yIncrease * yModifier)
-      const currentX = x1 + (xIncrease * xModifier)
-
-      if (this.isWithinBounds(currentX, currentY)) {
-        const p: Vec = [currentX, currentY]
-        points.push(p)
-      }
-    }
-
-    return points
   }
 
   private getCirclePoints (
