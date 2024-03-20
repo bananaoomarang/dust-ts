@@ -8,8 +8,8 @@ export function b64decode(str: string): ArrayBuffer {
   return bytes
 }
 
-export async function compressLevel (data: number[][]) {
-  const stream = new Blob([JSON.stringify(data)], {
+export async function compressLevel (data: Uint32Array) {
+  const stream = new Blob([JSON.stringify(Array.from(data))], {
     type: 'application/json'
   }).stream()
   const compressedStream = stream.pipeThrough(new CompressionStream('gzip'))

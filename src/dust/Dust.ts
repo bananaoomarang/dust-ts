@@ -212,7 +212,7 @@ export default class Dust {
   texcoordLocation: WebGLUniformLocation | null
   textureData = new Uint8ClampedArray(WIDTH * HEIGHT * 4)
 
-  grid = _create2dArray(WIDTH, HEIGHT)
+  grid = new Uint32Array(WIDTH * HEIGHT)
   blacklist = _create2dArray(WIDTH, HEIGHT)
   explosions: Explosion[] = []
 
@@ -316,6 +316,27 @@ export default class Dust {
     this._up[1] = -gy
   }
 
+  private setCell (x: number, y: number, val: number): void {
+    this.grid[x + y * HEIGHT] = val
+  }
+
+  private setCellFlag(x: number, y: number, flag: number): void {
+    this.grid[x + y * HEIGHT] |= flag
+  }
+
+  private removeCellFlag(x: number, y: number, flag: number): void {
+    this.grid[x + y * HEIGHT] &= ~flag
+  }
+
+  private getVal (x: number, y: number): M {
+    // if (!this.isWithinBounds(x, y)) {
+    //   return M.SOLID
+    // }
+
+    return this.grid[x + y * HEIGHT]
+  }
+
+
   private move(x1: number, y1: number, x2: number, y2: number): void {
     const dest = this.getVal(x2, y2)
 
@@ -326,22 +347,14 @@ export default class Dust {
 
     const cellValue = this.getVal(x1, y1)
 
-    this.grid[x1][y1] = 0
-    this.grid[x2][y2] = cellValue
+    this.setCell(x1, y1, 0)
+    this.setCell(x2, y2, cellValue)
 
     this.blacklist[x2][y2] = 1
   }
 
   private isWithinBounds (x: number, y: number): boolean {
     return (x >= 0 && x <= A_WIDTH && y >= 0 && y <= A_HEIGHT)
-  }
-
-  private getVal (x: number, y: number): M {
-    if (!this.isWithinBounds(x, y)) {
-      return M.SOLID
-    }
-
-    return this.grid[x][y]
   }
 
   private skim(maxShift: number, x: number, y: number): void {
@@ -396,8 +409,8 @@ export default class Dust {
     const d1 = this.getVal(x1, y1)
     const d2 = this.getVal(x2, y2)
 
-    this.grid[x1][y1] = d2
-    this.grid[x2][y2] = d1
+    this.setCell(x1, y1, d2)
+    this.setCell(x2, y2, d1)
 
     this.blacklist[x1][y1] = 1
     this.blacklist[x2][y2] = 1
@@ -410,7 +423,7 @@ export default class Dust {
     let rx = 0
     let ry = 0
 
-    for (let x = 0; x < this.grid.length; x++) {
+    for (let x = 0; x < WIDTH; x++) {
       rx = (x * xPrime + xOffset) % WIDTH
 
       for (let y = A_HEIGHT; y >= 0; y--) {
@@ -420,9 +433,9 @@ export default class Dust {
           continue
         }
 
-        const d = this.grid[rx][ry]
+        const d = this.grid[rx + ry * HEIGHT]
 
-        if (d === 0) {
+        if (d === M.SPACE) {
           continue
         }
 
@@ -563,7 +576,7 @@ export default class Dust {
       y <= 1 ||
       y >= HEIGHT - 1 ||
       this.blacklist[x][y] ||
-      this.grid[x][y] !== 0
+      this.getVal(x, y) !== M.SPACE
     ) {
       return
     }
@@ -581,7 +594,7 @@ export default class Dust {
   }
 
   private onInfectSurrounds = (x: number, y: number, cellValue: number) => {
-    const cell = this.grid[x][y]
+    const cell = this.getVal(x, y)
 
     if (cell & M.INFECTANT) {
       return
@@ -626,7 +639,8 @@ export default class Dust {
   //
   private updateFire(cellValue: number, x: number, y: number): void {
     if (cellValue & M.FIRE && Math.random() > 0.8) {
-      this.grid[x][y] |= M.BURNING
+      const val = this.getVal(x, y)
+      this.setCell(x, y, val | M.BURNING)
     }
 
     if (cellValue & M.BURNING && Math.random() > 0.8 && !this.blacklist[x][y]) {
@@ -694,7 +708,7 @@ export default class Dust {
     }
 
     const materialAbove = this.getMaterial(
-      this.grid[aboveX][aboveY]
+      this.getVal(aboveX, aboveY)
     )
 
     if (!materialAbove.density && materialAbove.density !== 0) {
@@ -706,7 +720,7 @@ export default class Dust {
     }
 
     const materialAboveSide = this.getMaterial(
-      this.grid[aboveSideX][aboveSideY]
+      this.getVal(aboveSideX, aboveSideY)
     )
 
     if (material.density < materialAbove.density) {
@@ -823,22 +837,23 @@ export default class Dust {
       return
     }
 
-    if (this.grid[x][y] & type) {
+    const d = this.grid[x + y * HEIGHT]
+    if (d & type) {
       return
     }
 
-    if (this.grid[x][y] === 0) {
-      this.grid[x][y] = type
+    if (d === M.SPACE) {
+      this.setCell(x, y, type)
       this.blacklist[x][y] = 1
-    } else if (this.grid[x][y] !== 0) {
-      this.grid[x][y] = type
+    } else if (this.getVal(x, y) !== M.SPACE) {
+      this.setCell(x, y, type)
       this.blacklist[x][y] = 1
     }
   }
 
   private destroy(x: number, y: number): void {
-    if (this.grid[x][y] !== 0) {
-      this.grid[x][y] = 0
+    if (this.getVal(x, y) !== M.SPACE) {
+      this.setCell(x, y, M.SPACE)
     }
   }
 
@@ -874,26 +889,26 @@ export default class Dust {
       if (nw === flagSet) this.spawn(x - 1, y - 1, flagToSet)
     } else {
       // Infect everything with the flag
-      if (n & flagSet) this.grid[x][y - 1] |= flagToSet
-      if (ne & flagSet) this.grid[x + 1][y - 1] |= flagToSet
-      if (e & flagSet) this.grid[x + 1][y] |= flagToSet
-      if (se & flagSet) this.grid[x + 1][y + 1] |= flagToSet
-      if (s & flagSet) this.grid[x][y + 1] |= flagToSet
-      if (sw & flagSet) this.grid[x - 1][y + 1] |= flagToSet
-      if (w & flagSet) this.grid[x - 1][y] ^= flagToSet
-      if (nw & flagSet) this.grid[x - 1][y - 1] |= flagToSet
+      if (n & flagSet) this.setCellFlag(x, y - 1, flagToSet)
+      if (ne & flagSet) this.setCellFlag(x + 1, y - 1, flagToSet)
+      if (e & flagSet) this.setCellFlag(x + 1, y, flagToSet)
+      if (se & flagSet) this.setCellFlag(x + 1, y + 1, flagToSet)
+      if (s & flagSet) this.setCellFlag(x, y + 1, flagToSet)
+      if (sw & flagSet) this.setCellFlag(x - 1, y + 1, flagToSet)
+      if (w & flagSet) this.setCellFlag(x - 1, y, flagToSet)
+      if (nw & flagSet) this.setCellFlag(x - 1, y - 1, flagToSet)
     }
 
     // Remove an optional flag
     if (flagToRemove) {
-      if (n & flagSet) this.grid[x][y - 1] &= ~flagToRemove
-      if (ne & flagSet) this.grid[x + 1][y - 1] &= ~flagToRemove
-      if (e & flagSet) this.grid[x + 1][y] &= ~flagToRemove
-      if (se & flagSet) this.grid[x + 1][y + 1] &= ~flagToRemove
-      if (s & flagSet) this.grid[x][y + 1] &= ~flagToRemove
-      if (sw & flagSet) this.grid[x - 1][y + 1] &= ~flagToRemove
-      if (w & flagSet) this.grid[x - 1][y] &= ~flagToRemove
-      if (nw & flagSet) this.grid[x - 1][y - 1] &= ~flagToRemove
+      if (n & flagSet) this.removeCellFlag(x, y - 1, flagToRemove)
+      if (ne & flagSet) this.removeCellFlag(x + 1, y - 1, flagToRemove)
+      if (e & flagSet) this.removeCellFlag(x + 1, y, flagToRemove)
+      if (se & flagSet) this.removeCellFlag(x + 1, y + 1, flagToRemove)
+      if (s & flagSet) this.removeCellFlag(x, y + 1, flagToRemove)
+      if (sw & flagSet) this.removeCellFlag(x - 1, y + 1, flagToRemove)
+      if (w & flagSet) this.removeCellFlag(x - 1, y, flagToRemove)
+      if (nw & flagSet) this.removeCellFlag(x - 1, y - 1, flagToRemove)
     }
   }
 
@@ -920,7 +935,7 @@ export default class Dust {
     f: (x: number, y: number, cellValue: number) => void,
     flag?: number
   ): void {
-    const cellValue = this.grid[x][y]
+    const cellValue = this.getVal(x, y)
 
     const n = this.getVal(x, y - 1)
     const ne = this.getVal(x + 1, y - 1)
@@ -953,15 +968,15 @@ export default class Dust {
   }
 
   private countNeighbours(x: number, y: number, exclusive: boolean = false): number {
-    const d = this.grid[x][y]
-    const n = this.grid[x][y - 1]
-    const ne = this.grid[x + 1][y - 1]
-    const e = this.grid[x + 1][y]
-    const se = this.grid[x + 1][y + 1]
-    const s = this.grid[x][y + 1]
-    const sw = this.grid[x - 1][y + 1]
-    const w = this.grid[x - 1][y]
-    const nw = this.grid[x - 1][y - 1]
+    const d = this.getVal(x, y)
+    const n = this.getVal(x, y - 1)
+    const ne = this.getVal(x + 1, y - 1)
+    const e = this.getVal(x + 1, y)
+    const se = this.getVal(x + 1, y + 1)
+    const s = this.getVal(x, y + 1)
+    const sw = this.getVal(x - 1, y + 1)
+    const w = this.getVal(x - 1, y)
+    const nw = this.getVal(x - 1, y - 1)
 
     let count = 0
 
@@ -1050,7 +1065,7 @@ export default class Dust {
   }
 
   clearLevel = (): void => {
-    this.grid = _create2dArray(WIDTH, HEIGHT)
+    this.grid = new Uint32Array(WIDTH * HEIGHT)
   }
 
   exportGrid = async (): Promise<string> => {
@@ -1063,7 +1078,7 @@ export default class Dust {
     this.grid = grid
   }
 
-  fillTextureData = (grid: number[][], textureData: Uint8ClampedArray) => {
+  fillTextureData = (grid: Uint32Array, textureData: Uint8ClampedArray) => {
     let color
     let offset = 0
 
@@ -1082,9 +1097,9 @@ export default class Dust {
       }
     }
 
-    for (let x = 0; x < grid.length; x++) {
-      for (let y = 0; y < grid[x].length; y++) {
-        const s = grid[x][y]
+    for (let x = 0; x < WIDTH; x++) {
+      for (let y = 0; y < HEIGHT; y++) {
+        const s = grid[x + y * HEIGHT]
         const brush = brushOutlines[x] && brushOutlines[x][y]
 
         if (brush) {
