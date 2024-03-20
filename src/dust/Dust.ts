@@ -329,9 +329,9 @@ export default class Dust {
   }
 
   private getVal (x: number, y: number): M {
-    // if (!this.isWithinBounds(x, y)) {
-    //   return M.SOLID
-    // }
+    if (!this.isWithinBounds(x, y)) {
+      return M.SOLID
+    }
 
     return this.grid[x + y * HEIGHT]
   }
@@ -361,7 +361,7 @@ export default class Dust {
     const absShift = Math.abs(maxShift)
     const dir = maxShift < 0 ? -1 : 1
     const [cx, cy] = dir === -1 ? this._left : this._right
-    const points = this.interpolator.calculate(x, y, x + (cx * absShift), y + (cy * absShift))
+    const points = this.interpolator.calculate(x, y, x + (cx * absShift), y + (cy * absShift)).slice(0)
 
     for (let i = 0; i < points.length; i++) {
       const hasNext = !!points[i + 1]
@@ -387,17 +387,17 @@ export default class Dust {
         break
       }
 
-      // const belowPoints = this.interpolatePoints(
-      //   currentX,
-      //   currentY,
-      //   currentX + this.gravity[0],
-      //   currentY + this.gravity[1]
-      // )
+      const belowPoints = this.interpolator.calculate(
+        currentX,
+        currentY,
+        currentX + this.gravity[0],
+        currentY + this.gravity[1]
+      )
 
-      // if (belowPoints.length && this.getVal(belowPoints[0][0], belowPoints[0][1]) === M.SPACE) {
-      //   this.move(x, y, belowPoints[0][0], belowPoints[0][1])
-      //   break
-      // } 
+      if (belowPoints.length && this.getVal(belowPoints[0][0], belowPoints[0][1]) === M.SPACE) {
+        this.move(x, y, belowPoints[0][0], belowPoints[0][1])
+        break
+      } 
     }
   }
 
@@ -467,8 +467,12 @@ export default class Dust {
 
         const material = this.getMaterial(d)
         const xDir = Math.random() < 0.5 ? -1 : 1
-        if (material.density && material.density > 0) {
-          this.updateFloating(d, rx, ry, material, xDir)
+
+        if (material.density && Math.abs(material.density)) {
+          this.updateFloating(d, rx, ry, material.density, xDir)
+        }
+
+        if (material.density && material.density >= 0) {
           const fell = this.updateGravity(rx, ry)
 
           if (!fell) {
@@ -690,11 +694,7 @@ export default class Dust {
   //
   // Handle changes due to material density
   //
-  private updateFloating(cellValue: number, x: number, y: number, material: Material, xDir: number): void {
-    if (!material.density && material.density !== 0) {
-      return
-    }
-
+  private updateFloating(cellValue: number, x: number, y: number, density: number, xDir: number): void {
     const [ux, uy] = this._up
     const [sideX, sideY] = xDir === -1 ? this._left : this._right
 
@@ -707,15 +707,16 @@ export default class Dust {
       return
     }
 
-    const materialAbove = this.getMaterial(
+    const { density: aboveDensity }= this.getMaterial(
       this.getVal(aboveX, aboveY)
     )
 
-    if (!materialAbove.density && materialAbove.density !== 0) {
-      return
-    }
-
-    if (!this.isWithinBounds(aboveSideX, aboveSideY)) {
+    if (
+      (!aboveDensity && aboveDensity !== 0) ||
+      (aboveDensity === density) ||
+      (aboveDensity === 0 && density > 0) ||
+      !this.isWithinBounds(aboveSideX, aboveSideY)
+    ) {
       return
     }
 
@@ -723,7 +724,7 @@ export default class Dust {
       this.getVal(aboveSideX, aboveSideY)
     )
 
-    if (material.density < materialAbove.density) {
+    if (density < aboveDensity) {
       if (cellValue & M.FIRE) {
         this.swap(x, y, aboveX, aboveY)
       } else if (Math.random() < 0.7 && (materialAboveSide.density || materialAboveSide.density === 0)) {
@@ -736,14 +737,14 @@ export default class Dust {
 
   private updateGravity(x: number, y: number): boolean {
     const [gx, gy] = this.gravity
-    const p = this.interpolator.calculate(x, y, x + gx, y + gy)
+    // const p = this.interpolator.calculate(x, y, x + gx, y + gy)
 
-    if (p.length === 0) {
-      return false
-    }
+    // if (p.length === 0) {
+    //   return false
+    // }
 
-    const x2 = Math.round(p[0][0])
-    const y2 = Math.round(p[0][1])
+    const x2 = Math.round(x + gx)
+    const y2 = Math.round(y + gy)
 
     if (this.getVal(x2, y2) === M.SPACE) {
       this.move(x, y, x2, y2)
