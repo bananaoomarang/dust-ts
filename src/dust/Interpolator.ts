@@ -3,7 +3,7 @@ export type Vec = [number, number]
 export default class Interpolator {
   points: Vec[] = []
 
-  calculate(x1: number, y1: number, x2: number, y2: number) {
+  calculate(x1: number, y1: number, x2: number, y2: number): Vec[] {
     const xDiff = x1 - x2
     const yDiff = y1 - y2
     const xDiffIsLarger = Math.abs(xDiff) > Math.abs(yDiff)
@@ -12,6 +12,14 @@ export default class Interpolator {
     const yModifier = yDiff < 0 ? 1 : -1
 
     const upperBound = Math.max(Math.abs(xDiff), Math.abs(yDiff))
+
+    if (upperBound === 1) {
+      this.points.length = 0
+      const p: Vec = [Math.round(x2), Math.round(y2)]
+      this.points.push(p)
+      return this.points
+    }
+
     const min = Math.min(Math.abs(xDiff), Math.abs(yDiff))
     const slope = (min === 0 || upperBound === 0) ? 0 : ((min + 1) / (upperBound + 1))
 
