@@ -5,7 +5,10 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 import { getRandomStepParams } from './random-shuffler'
-import Interpolator, { Vec } from './Interpolator'
+import * as asmMod from '../../build/release'
+const { interpolate } = asmMod
+
+type Vec = [number, number]
 
 export const WIDTH = 500
 export const HEIGHT = 500
@@ -212,11 +215,9 @@ export default class Dust {
   texcoordLocation: WebGLUniformLocation | null
   textureData = new Uint8ClampedArray(WIDTH * HEIGHT * 4)
 
-  grid = new Uint32Array(WIDTH * HEIGHT)
+  grid = new Uint32Array(asmMod.memory.buffer, asmMod.gridPtr.value, WIDTH * HEIGHT)
   blacklist = _create2dArray(WIDTH, HEIGHT)
   explosions: Explosion[] = []
-
-  interpolator: Interpolator = new Interpolator()
 
   lifeTimer = new Timer()
   lifeTime = 50
@@ -277,7 +278,7 @@ export default class Dust {
     this.handleBrushes()
 
     if (!this.paused) {
-      this.update()
+      asmMod.update()
     }
 
     this.draw()
@@ -361,7 +362,7 @@ export default class Dust {
     const absShift = Math.abs(maxShift)
     const dir = maxShift < 0 ? -1 : 1
     const [cx, cy] = dir === -1 ? this._left : this._right
-    const points = this.interpolator.calculate(x, y, x + (cx * absShift), y + (cy * absShift)).slice(0)
+    const points = interpolate(x, y, x + (cx * absShift), y + (cy * absShift)).slice(0)
 
     for (let i = 0; i < points.length; i++) {
       const hasNext = !!points[i + 1]
@@ -387,7 +388,7 @@ export default class Dust {
         break
       }
 
-      const belowPoints = this.interpolator.calculate(
+      const belowPoints = interpolate(
         currentX,
         currentY,
         currentX + this.gravity[0],
@@ -757,7 +758,7 @@ export default class Dust {
   private getNextPoint(start: Vec, change: Vec): M {
     const [x, y] = start
     const [dx, dy] = change
-    const points = this.interpolator.calculate(x, y, x + dx, y + dy)
+    const points = interpolate(x, y, x + dx, y + dy)
 
     if (points.length === 0) {
       return M.SOLID
