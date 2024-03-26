@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import useSWR from 'swr'
 import classNames from 'classnames'
-import Dust, { BrushType, WIDTH, HEIGHT } from './dust/Dust'
+import Dust, { BrushType, WIDTH, HEIGHT, GRID } from './dust/Dust'
 import Point from './dust/Point'
 import * as glUtil from './dust/gl-util'
 import MaterialSelector from './MaterialSelector'
@@ -214,15 +214,15 @@ function GameApp({ levelId }: Props) {
     }
 
     const rad = gravity * (Math.PI / 180)
-    const x = Math.sin(rad)
+    const x = -Math.sin(rad)
     const y = Math.cos(rad)
     const absX = Math.abs(x)
     const absY = Math.abs(y)
 
     if ((absX > 0 && absX < 1) || (absY > 0 && absY < 1)) {
-      game.gravity = [x * 2, y * 2]
+      GRID.set_gravity(x * 2, y * 2)
     } else {
-      game.gravity = [x, y]
+      GRID.set_gravity(x, y)
     }
   }, [gravity])
 

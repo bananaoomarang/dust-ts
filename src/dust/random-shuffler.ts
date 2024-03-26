@@ -11,8 +11,6 @@ export function getRandomStepParams(range: number): [number, number] {
   return [prime, offset]
 }
 
-getRandomStepParams(500)
-
 function _selectCoPrimeResev(min: number, target: number) {
   let count = 0
   let selected = 0

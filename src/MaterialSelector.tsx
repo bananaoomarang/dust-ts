@@ -19,57 +19,57 @@ type ModifierSelector = {
 const TYPES: BaseMaterialSelector[] = [
   {
     label: 'Sand',
-    value: 'sand',
+    value: 'Sand',
     emoji: '⏳'
   },
   {
     label: 'Oil',
-    value: 'oil',
+    value: 'Oil',
     emoji: '🫗'
   },
   {
     label: 'Fire',
-    value: 'fire',
+    value: 'Fire',
     emoji: '🔥'
   },
   {
     label: 'Water',
-    value: 'water',
+    value: 'Water',
     emoji: '🌊'
   },
   {
     label: 'Solid',
-    value: 'solid',
+    value: 'Solid',
     emoji: '🧱'
   },
   {
     label: 'Lava',
-    value: 'lava',
+    value: 'Lava',
     emoji: '♨️'
   },
   {
     label: 'Spring',
-    value: 'spring',
+    value: 'Spring',
     emoji: '🚰'
   },
   {
     label: 'Volcanic',
-    value: 'volcanic',
+    value: 'Volcanic',
     emoji: '🌋'
   },
   {
     label: 'Oil Well',
-    value: 'oil well',
+    value: 'OilWell',
     emoji: '🛢'
   },
   {
     label: 'Fuse',
-    value: 'fuse',
+    value: 'Fuse',
     emoji: '💣'
   },
   {
     label: 'Life Itself',
-    value: 'life',
+    value: 'Life',
     emoji: '🛸'
   },
   {
@@ -79,7 +79,7 @@ const TYPES: BaseMaterialSelector[] = [
   },
   {
     label: 'Eraser',
-    value: 'space',
+    value: 'Space',
     emoji: '🫥'
   }
 ]

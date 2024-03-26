@@ -5,13 +5,18 @@ import fragShader from './shaders/frag.glsl?raw'
 import Explosion from './Explosion'
 import { compressLevel, decompressLevel } from './level-utils'
 import { getRandomStepParams } from './random-shuffler'
-import * as asmMod from '../../build/release'
-const { interpolate } = asmMod
+import { Grid, Brush, Cell } from 'rusty-dust'
+import { memory } from 'rusty-dust/rusty_dust_bg.wasm'
+import Interpolator from './Interpolator'
 
-type Vec = [number, number]
+const interpolator = new Interpolator();
 
 export const WIDTH = 500
 export const HEIGHT = 500
+
+export const GRID = Grid.new(WIDTH, HEIGHT)
+
+type Vec = [number, number]
 
 const A_WIDTH = WIDTH - 1
 const A_HEIGHT = HEIGHT - 1
@@ -37,23 +42,6 @@ enum M {
   OIL_WELL = (SOLID | OIL)
 }
 
-const TYPE_MAP: Record<BrushType, M> = {
-  space: M.SPACE,
-  sand: M.SAND,
-  oil: M.OIL,
-  fire: M.FIRE,
-  lava: M.LAVA,
-  water: M.WATER,
-  steam: M.STEAM,
-  solid: M.SOLID,
-  spring: M.SPRING,
-  volcanic: M.VOLCANIC,
-  ['oil well']: M.OIL_WELL,
-  life: M.LIFE,
-  C4: M.C4,
-  fuse: M.FUSE
-}
-
 export type Level = {
   id: number
   name: string
@@ -73,7 +61,7 @@ type Material = {
   liquid?: boolean
 }
 
-export type BrushType = "sand" | "oil" | "fire" | "lava" | "water" | "steam" | "solid" | "life" | "C4" | "spring" | "volcanic" | "oil well" | "space" | "fuse"
+export type BrushType = "Sand" | "Oil" | "Fire" | "Lava" | "Water" | "Steam" | "Solid" | "Life" | "C4" | "Spring" | "Volcanic" | "OilWell" | "Space" | "Fuse"
 
 export type BrushModifier = "burning" | "infectant"
 
@@ -215,14 +203,14 @@ export default class Dust {
   texcoordLocation: WebGLUniformLocation | null
   textureData = new Uint8ClampedArray(WIDTH * HEIGHT * 4)
 
-  grid = new Uint32Array(asmMod.memory.buffer, asmMod.gridPtr.value, WIDTH * HEIGHT)
+  grid = new Uint8Array()
   blacklist = _create2dArray(WIDTH, HEIGHT)
   explosions: Explosion[] = []
 
   lifeTimer = new Timer()
   lifeTime = 50
 
-  paused = false
+  _paused = false
 
   fpsNode: HTMLElement | null
 
@@ -275,11 +263,7 @@ export default class Dust {
   run = () => {
     const { fpsTimer, fpsNode } = this
 
-    this.handleBrushes()
-
-    if (!this.paused) {
-      asmMod.update()
-    }
+    GRID.tick()
 
     this.draw()
 
@@ -295,6 +279,15 @@ export default class Dust {
     if (!this.step) {
       window.requestAnimationFrame(this.run)
     }
+  }
+
+  get paused() {
+    return this._paused
+  }
+
+  set paused(paused: boolean) {
+    this._paused = paused
+    GRID.set_paused(paused)
   }
 
   get gravity() {
@@ -362,7 +355,7 @@ export default class Dust {
     const absShift = Math.abs(maxShift)
     const dir = maxShift < 0 ? -1 : 1
     const [cx, cy] = dir === -1 ? this._left : this._right
-    const points = interpolate(x, y, x + (cx * absShift), y + (cy * absShift)).slice(0)
+    const points = interpolator.calculate(x, y, x + (cx * absShift), y + (cy * absShift)).slice(0)
 
     for (let i = 0; i < points.length; i++) {
       const hasNext = !!points[i + 1]
@@ -388,7 +381,7 @@ export default class Dust {
         break
       }
 
-      const belowPoints = interpolate(
+      const belowPoints = interpolator.calculate(
         currentX,
         currentY,
         currentX + this.gravity[0],
@@ -498,7 +491,7 @@ export default class Dust {
   private draw() {
     const { gl } = this
 
-    this.fillTextureData(this.grid, this.textureData)
+    this.textureData = new Uint8ClampedArray(memory.buffer, GRID.texture(), WIDTH * HEIGHT * 4)
 
     gl.clear(gl.COLOR_BUFFER_BIT)
 
@@ -523,16 +516,6 @@ export default class Dust {
 
     gl.uniform1i(this.textureLocation, 0)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
-  }
-
-  private handleBrushes(): void {
-    for (const [_, brush] of Object.entries(this.brushes)) {
-      if (!brush.active) {
-        continue
-      }
-
-      this.spawnCircle(brush)
-    }
   }
 
   private updateSprings(cellValue: number, x: number, y: number): void {
@@ -758,7 +741,7 @@ export default class Dust {
   private getNextPoint(start: Vec, change: Vec): M {
     const [x, y] = start
     const [dx, dy] = change
-    const points = interpolate(x, y, x + dx, y + dy)
+    const points = interpolator.calculate(x, y, x + dx, y + dy)
 
     if (points.length === 0) {
       return M.SOLID
@@ -1016,58 +999,19 @@ export default class Dust {
     id: number,
     brush: Brush
   ) => {
-    this.brushes[id] = brush
+    const rustBrush = Brush.new(brush.x, brush.y, Cell.Sand, brush.size, brush.active, brush.infect)
+    GRID.add_brush(
+      id,
+      rustBrush
+    )
   }
 
   removeBrush = (id: number) => {
-    delete this.brushes[id]
-  }
-
-  private getCirclePoints (
-    centerX: number,
-    centerY: number,
-    radius: number,
-    fill: boolean = false
-  ): number[][] {
-    const results = []
-
-    for(let rad = radius; rad >= (fill ? 0 : radius); rad--) {
-      for(let i = 0; i <= Math.PI * 2; i += 0.006){
-        const pX = centerX + rad * Math.cos(i)
-        const pY = centerY + rad * Math.sin(i)
-        const x = Math.round(pX)
-        const y = Math.round(pY)
-
-        if (x > A_WIDTH || x < 0 || y > A_HEIGHT || y < 0) {
-          continue
-        }
-
-        results.push([Math.round(pX), Math.round(pY)])
-      }
-    }
-
-    return results
-  }
-
-  spawnCircle = ({ x: centerX, y: centerY, type, size, infect }: Brush) => {
-    let nType = typeof type === 'string' ? TYPE_MAP[type] || 0 : type
-
-    if (infect && nType !== M.SPACE) {
-      nType = (M.INFECTANT | nType)
-    }
-
-    if (size === 1) {
-      this.spawn(WIDTH - centerX, centerY, nType)
-      return
-    }
-
-    for (const [x, y] of this.getCirclePoints(WIDTH - centerX, centerY, size, true)) {
-      this.spawn(x, y, nType)
-    }
+    GRID.remove_brush(id)
   }
 
   clearLevel = (): void => {
-    this.grid = new Uint32Array(WIDTH * HEIGHT)
+    this.grid = new Uint8Array(WIDTH * HEIGHT)
   }
 
   exportGrid = async (): Promise<string> => {
@@ -1080,35 +1024,13 @@ export default class Dust {
     this.grid = grid
   }
 
-  fillTextureData = (grid: Uint32Array, textureData: Uint8ClampedArray) => {
+  fillTextureData (grid: Uint32Array, textureData: Uint8ClampedArray) {
     let color
     let offset = 0
-
-    const brushOutlines: boolean[][] = []
-    for (const [_, brush] of Object.entries(this.brushes)) {
-      if (brush.active) {
-        continue
-      }
-
-      const points = this.getCirclePoints(WIDTH - brush.x, brush.y, brush.size)
-      for (const [x, y] of points) {
-        if (!brushOutlines[x]) {
-          brushOutlines[x] = []
-        }
-        brushOutlines[x][y] = true
-      }
-    }
 
     for (let x = 0; x < WIDTH; x++) {
       for (let y = 0; y < HEIGHT; y++) {
         const s = grid[x + y * HEIGHT]
-        const brush = brushOutlines[x] && brushOutlines[x][y]
-
-        if (brush) {
-          _setPixel(textureData, offset, 255, 255, 255, 255)
-          offset += 4
-          continue
-        }
 
         if (s === 0) {
           _setPixel(textureData, offset, 0, 0, 0, 0)
